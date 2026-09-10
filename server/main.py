@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from .database import Database
 from .models import Event, Provider, SessionCreate, SessionPatch, State
 
-VERSION = "0.1.0"
+VERSION = "1.0.0"
 STATIC = Path(__file__).parent / "static"
 MAX_BODY = 65536
 

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "slopwatchdeluxe"
-version = "0.1.0"
+version = "1.0.0"
 description = "A self-hosted attention dashboard for coding agents"
 requires-python = ">=3.11"
 license = {file = "LICENSE"}
