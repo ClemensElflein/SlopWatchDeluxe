@@ -17,7 +17,7 @@ Primary references:
 
 | | Codex | Claude Code |
 | --- | --- | --- |
-| Global file used by AgentWatch | `$CODEX_HOME/hooks.json`, default `~/.codex/hooks.json` | `$CLAUDE_CONFIG_DIR/settings.json`, default `~/.claude/settings.json` |
+| Global file used by SlopWatchDeluxe | `$CODEX_HOME/hooks.json`, default `~/.codex/hooks.json` | `$CLAUDE_CONFIG_DIR/settings.json`, default `~/.claude/settings.json` |
 | Other representations | Inline TOML hooks and plugin hooks | Project/local/managed settings, plugins, skills |
 | Shape | `hooks[event]` is an array of matcher groups, each with a `hooks` handler array | Same nesting |
 | Handler used | `type: command`, shell-quoted absolute command, `timeout: 2` | Same |
@@ -25,7 +25,7 @@ Primary references:
 | Coexistence | All matching sources accumulate; inline TOML plus JSON produces a warning | Hook arrays merge across settings layers |
 | Activation | Review/trust new or changed definitions through `/hooks`; hooks are enabled by default | Start a fresh CLI session after installation; inspect `/hooks` |
 
-AgentWatch only edits JSON. It leaves Codex `config.toml` byte-for-byte intact,
+SlopWatchDeluxe only edits JSON. It leaves Codex `config.toml` byte-for-byte intact,
 including existing `notify` and inline hooks. It validates the whole JSON
 structure, adds its own handler groups, preserves all unrelated values, backs
 up original bytes, and atomically replaces the file. It uses an exact owned
@@ -36,9 +36,9 @@ Duplicate JSON keys are rejected instead of silently losing values.
 
 **Codex requires human trust review.** The installer does not synthesize trust
 hashes or turn off trust checks. Configured does not mean activated: run Codex,
-open `/hooks`, and trust the displayed AgentWatch commands once. A changed
+open `/hooks`, and trust the displayed SlopWatchDeluxe commands once. A changed
 command may need review again. Organization policy or disabled hooks can stop
-either integration; AgentWatch does not override these settings.
+either integration; SlopWatchDeluxe does not override these settings.
 
 ### Observed Codex startup timing
 
@@ -56,7 +56,7 @@ client collects it. Optional `model`, `agent_type`, `agent_id`, `turn_id`,
 `tool_name`, and `tool_use_id` become bounded metadata. `prompt` supplies the
 user message and `last_assistant_message` the completed response. Codex reports
 model on common inputs; Claude principally reports it at SessionStart.
-Tool inputs differ and are never executed by AgentWatch. On Linux, Codex Bash
+Tool inputs differ and are never executed by SlopWatchDeluxe. On Linux, Codex Bash
 permission hooks also pass the command to a detached local execution observer;
 the command is used only for comparison with process arguments.
 
@@ -88,7 +88,7 @@ Other supported lifecycle hooks are deliberately unused: Codex SubagentStart,
 SubagentStop, PreCompact, PostCompact; Claude's setup, subagent, task, teammate,
 configuration, file/worktree, model, and display hooks. SubagentStop must not
 announce completion of the parent. Claude subagent tool events carry agent_id;
-AgentWatch ignores ordinary subagent activity but forwards requests requiring
+SlopWatchDeluxe ignores ordinary subagent activity but forwards requests requiring
 human attention and their resolutions into the parent card.
 
 ## State inference and limits

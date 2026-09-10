@@ -1,0 +1,22 @@
+name: slopwatchdeluxe
+
+services:
+  slopwatchdeluxe:
+    container_name: slopwatchdeluxe
+    image: ghcr.io/clemenselflein/slopwatchdeluxe:latest
+    build: .
+    restart: unless-stopped
+    ports:
+      - "${SLOPWATCHDELUXE_PORT:-8765}:8765"
+    environment:
+      SLOPWATCHDELUXE_PORT: 8765
+      SLOPWATCHDELUXE_DATABASE: /data/slopwatchdeluxe.db
+      SLOPWATCHDELUXE_ARCHIVE_AFTER_HOURS: ${SLOPWATCHDELUXE_ARCHIVE_AFTER_HOURS:-24}
+      SLOPWATCHDELUXE_API_TOKEN: ${SLOPWATCHDELUXE_API_TOKEN:-}
+    volumes:
+      - slopwatchdeluxe-data:/data
+    init: true
+    stop_grace_period: 5s
+
+volumes:
+  slopwatchdeluxe-data:

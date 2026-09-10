@@ -21,12 +21,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("url", nargs="?", default="http://127.0.0.1:8765")
     args = parser.parse_args()
-    config = {"url": args.url.rstrip("/"), "token": os.getenv("AGENTWATCH_TEST_TOKEN", "")}
+    config = {"url": args.url.rstrip("/"), "token": os.getenv("SLOPWATCHDELUXE_TEST_TOKEN", "")}
     assert request(config, "/api/v1/health")["status"] == "ok"
     created = []
-    run_id = "agentwatch-smoke-" + str(uuid4())
+    run_id = "slopwatchdeluxe-smoke-" + str(uuid4())
     try:
-        with tempfile.TemporaryDirectory(prefix="agentwatch-smoke-") as temp:
+        with tempfile.TemporaryDirectory(prefix="slopwatchdeluxe-smoke-") as temp:
             home = Path(temp)
             tools = home / "tools"
             tools.mkdir()
@@ -34,20 +34,20 @@ def main():
                 binary = tools / name
                 binary.write_text(f"#!/bin/sh\nprintf '%s\\n' '{version}'\n")
                 binary.chmod(0o755)
-            source = home / "agentwatch.pyz"
+            source = home / "slopwatchdeluxe.pyz"
             source.write_bytes(build_bytes())
             env = {**os.environ, "HOME": str(home), "CODEX_HOME": str(home / ".codex"),
                    "CLAUDE_CONFIG_DIR": str(home / ".claude"), "XDG_CONFIG_HOME": str(home / ".config"),
                    "PATH": str(tools) + os.pathsep + os.environ.get("PATH", ""),
-                   "AGENTWATCH_TEST_TOKEN": config["token"]}
+                   "SLOPWATCHDELUXE_TEST_TOKEN": config["token"]}
             def cli(*argv):
                 result = subprocess.run([sys.executable, str(source), *argv], env=env, cwd=home,
                                         capture_output=True, text=True, timeout=15)
                 assert result.returncode == 0, result.stderr
                 return result.stdout
-            print(cli("install", "--yes", "--url", config["url"], "--token-env", "AGENTWATCH_TEST_TOKEN"))
+            print(cli("install", "--yes", "--url", config["url"], "--token-env", "SLOPWATCHDELUXE_TEST_TOKEN"))
             print(cli("status"))
-            installed = json.loads((home / ".config/agentwatch/config.json").read_text())
+            installed = json.loads((home / ".config/slopwatchdeluxe/config.json").read_text())
             for provider in ("codex", "claude"):
                 identity = run_id + "-" + provider
                 cmd = installed["integrations"][provider]["command"]

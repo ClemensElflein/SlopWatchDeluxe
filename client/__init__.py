@@ -1,3 +1,3 @@
-"""Standard-library-only AgentWatch client."""
+"""Standard-library-only SlopWatchDeluxe client."""
 
 VERSION = "0.1.0"

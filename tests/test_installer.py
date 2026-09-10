@@ -11,7 +11,7 @@ import pytest
 from client.build import build_bytes
 from client.config import config_path, read_json
 from client.installer import (hooks_installed, install_files, provider_path, uninstall_files,
-                             merge_hooks, is_agentwatch, apply_changes, detect)
+                             merge_hooks, is_slopwatchdeluxe, apply_changes, detect)
 
 
 def setup(providers=("codex", "claude")):
@@ -27,9 +27,9 @@ def test_fresh_install_and_zipapp_runs(fake_home):
     config = setup()
     assert read_json(config_path())["token"] == "test-token"
     assert config_path().stat().st_mode & 0o777 == 0o600
-    assert is_agentwatch(Path(config["binary"]))
+    assert is_slopwatchdeluxe(Path(config["binary"]))
     result = subprocess.run([sys.executable, config["binary"], "--version"], capture_output=True, text=True)
-    assert result.returncode == 0 and "AgentWatch 0.1.0" in result.stdout
+    assert result.returncode == 0 and "SlopWatchDeluxe 0.1.0" in result.stdout
     for provider in ("codex", "claude"):
         assert hooks_installed(provider, config)
         assert "test-token" not in provider_path(provider).read_text()
@@ -43,14 +43,14 @@ def test_existing_hooks_and_idempotence(fake_home):
         write(provider_path(provider), before)
     config = setup()
     first = {p: provider_path(p).read_bytes() for p in ("codex", "claude")}
-    backups = list(fake_home.rglob("*.agentwatch-backup-*"))
+    backups = list(fake_home.rglob("*.slopwatchdeluxe-backup-*"))
     assert len(backups) == 2
     for p in ("codex", "claude"):
         data = read_json(provider_path(p))
         assert data["model"] == before["model"]
         assert data["hooks"]["Stop"][0] == before["hooks"]["Stop"][0]
     setup()
-    assert len(list(fake_home.rglob("*.agentwatch-backup-*"))) == len(backups)
+    assert len(list(fake_home.rglob("*.slopwatchdeluxe-backup-*"))) == len(backups)
     for p in first:
         assert provider_path(p).read_bytes() == first[p]
     assert uninstall_files()
@@ -65,7 +65,7 @@ def test_uninstall_preserves_hooks_added_after_install(fake_home):
     config = setup()
     path = provider_path("claude")
     data = read_json(path)
-    unrelated = {"type": "command", "command": "echo someone-else-agentwatch"}
+    unrelated = {"type": "command", "command": "echo someone-else-slopwatchdeluxe"}
     data["hooks"]["Stop"][0]["hooks"].append(unrelated)
     data["customSetting"] = "keep me"
     write(path, data)
@@ -85,7 +85,7 @@ def test_malformed_config_fails_before_writes(fake_home, malformed):
     assert path.read_text() == malformed
     assert not provider_path("codex").exists()
     assert not config_path().exists()
-    assert not (fake_home / ".local/bin/agentwatch").exists()
+    assert not (fake_home / ".local/bin/slopwatchdeluxe").exists()
 
 
 def test_backup_original_bytes_and_toml_untouched(fake_home):
@@ -97,7 +97,7 @@ def test_backup_original_bytes_and_toml_untouched(fake_home):
     toml.write_text('# existing config\nnotify = ["my-notifier"]\n[features]\nhooks = true\n')
     before = toml.read_bytes()
     setup()
-    backup = next(path.parent.glob("hooks.json.agentwatch-backup-*"))
+    backup = next(path.parent.glob("hooks.json.slopwatchdeluxe-backup-*"))
     assert backup.read_bytes() == original
     assert backup.stat().st_mode & 0o777 == 0o600
     assert toml.read_bytes() == before
@@ -124,12 +124,12 @@ def test_custom_provider_directory_move(fake_home, monkeypatch):
 
 
 def test_unrelated_binary_and_symlink_refused(fake_home):
-    binary = fake_home / ".local/bin/agentwatch"
+    binary = fake_home / ".local/bin/slopwatchdeluxe"
     binary.parent.mkdir(parents=True)
-    binary.write_text("not AgentWatch")
+    binary.write_text("not SlopWatchDeluxe")
     with pytest.raises(ValueError, match="unrelated"):
         setup()
-    assert binary.read_text() == "not AgentWatch"
+    assert binary.read_text() == "not SlopWatchDeluxe"
     binary.unlink()
     target = fake_home / "actual.json"
     target.write_text("{}")
@@ -170,7 +170,7 @@ def test_concurrent_edit_and_rollback(fake_home, monkeypatch):
 
 
 def test_shell_quoted_install_path_and_untrusted_payload(fake_home):
-    binary = fake_home / "bin weird ' $(touch BAD)" / "agentwatch"
+    binary = fake_home / "bin weird ' $(touch BAD)" / "slopwatchdeluxe"
     config = install_files("http://127.0.0.1:1", "", ["codex"], binary=binary)
     command = config["integrations"]["codex"]["command"]
     assert shlex.split(command)[1] == str(binary)

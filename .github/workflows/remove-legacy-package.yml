@@ -1,0 +1,21 @@
+name: Remove legacy container package
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  remove:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm replacement and remove legacy package
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh api /users/ClemensElflein/packages/container/slopwatchdeluxe/versions --jq '.[].metadata.container.tags[]' | grep -Fx latest
+          gh api --method DELETE /users/ClemensElflein/packages/container/agentwatch
+          gh api /users/ClemensElflein/packages/container/slopwatchdeluxe --jq '{name, visibility, html_url}'

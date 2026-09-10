@@ -23,7 +23,7 @@ from .config import config_path, endpoint, load_config, read_json
 from .transport import request
 
 MIN_VERSIONS = {"codex": (0, 154, 0), "claude": (2, 1, 259)}
-MARKER = "--agentwatch-managed"
+MARKER = "--slopwatchdeluxe-managed"
 
 
 def detect(provider):
@@ -100,13 +100,13 @@ def encoded(data):
 
 def snapshot(path):
     if path.is_symlink():
-        raise ValueError(f"Refusing to replace symlink: {path}. Use a regular file for AgentWatch-managed edits.")
+        raise ValueError(f"Refusing to replace symlink: {path}. Use a regular file for SlopWatchDeluxe-managed edits.")
     return path.read_bytes() if path.exists() else None
 
 
 def atomic_write(path, content, mode):
     path.parent.mkdir(parents=True, exist_ok=True)
-    fd, temp = tempfile.mkstemp(prefix=".agentwatch-", dir=path.parent)
+    fd, temp = tempfile.mkstemp(prefix=".slopwatchdeluxe-", dir=path.parent)
     try:
         with os.fdopen(fd, "wb") as handle:
             os.fchmod(handle.fileno(), mode)
@@ -135,7 +135,7 @@ def apply_changes(changes):
                 raise ValueError(f"Configuration changed concurrently: {path}")
             if old is not None:
                 stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
-                backup = path.with_name(path.name + ".agentwatch-backup-" + stamp)
+                backup = path.with_name(path.name + ".slopwatchdeluxe-backup-" + stamp)
                 with backup.open("xb") as handle:
                     os.fchmod(handle.fileno(), 0o600)
                     handle.write(old)
@@ -166,27 +166,27 @@ def install_lock(config_file):
         try:
             fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
-            raise ValueError("Another AgentWatch installer is running") from None
+            raise ValueError("Another SlopWatchDeluxe installer is running") from None
         yield
 
 
-def is_agentwatch(path):
+def is_slopwatchdeluxe(path):
     try:
         with zipfile.ZipFile(path) as archive:
-            info = archive.getinfo("agentwatch-build.json")
-            return info.file_size < 1024 and json.loads(archive.read(info)).get("application") == "agentwatch"
+            info = archive.getinfo("slopwatchdeluxe-build.json")
+            return info.file_size < 1024 and json.loads(archive.read(info)).get("application") == "slopwatchdeluxe"
     except (OSError, ValueError, KeyError, zipfile.BadZipFile):
         return False
 
 
 def artifact_bytes():
     source = Path(sys.argv[0])
-    return source.read_bytes() if is_agentwatch(source) else build_bytes()
+    return source.read_bytes() if is_slopwatchdeluxe(source) else build_bytes()
 
 
 def install_files(url, token, providers, config_file=None, binary=None):
     config_file = Path(config_file or config_path()).absolute()
-    binary = Path(binary or Path.home() / ".local/bin/agentwatch").absolute()
+    binary = Path(binary or Path.home() / ".local/bin/slopwatchdeluxe").absolute()
     url = endpoint(url)
     if not isinstance(token, str) or len(token) > 4096 or any(ord(c) < 32 or ord(c) > 126 for c in token):
         raise ValueError("API token must contain only printable ASCII and be at most 4096 characters")
@@ -196,16 +196,16 @@ def install_files(url, token, providers, config_file=None, binary=None):
         old_config = snapshot(config_file)
         config = read_json(config_file, missing=True)
         old_binary = snapshot(binary)
-        if old_binary is not None and not is_agentwatch(binary):
+        if old_binary is not None and not is_slopwatchdeluxe(binary):
             raise ValueError(f"An unrelated file already exists at {binary}; leaving it untouched")
         records = config.get("integrations", {})
         if not isinstance(records, dict):
-            raise ValueError("Invalid AgentWatch installation record")
+            raise ValueError("Invalid SlopWatchDeluxe installation record")
         # Gather old and new targets first, including integrations moved to a different directory.
         targets = {}
         for provider, record in records.items():
             if provider not in ADAPTERS or not isinstance(record, dict):
-                raise ValueError("Invalid AgentWatch provider installation record")
+                raise ValueError("Invalid SlopWatchDeluxe provider installation record")
             path = Path(record["path"])
             targets.setdefault(path, {"owned": set()})["owned"].add(record["command"])
         new_records = {}
@@ -254,7 +254,7 @@ def uninstall_files(config_file=None):
             if updated != data:
                 changes.append((path, original, encoded(updated), stat.S_IMODE(path.stat().st_mode)))
         binary = Path(config["binary"])
-        if binary.exists() and is_agentwatch(binary):
+        if binary.exists() and is_slopwatchdeluxe(binary):
             changes.append((binary, snapshot(binary), None, 0o755))
         changes.append((config_file, snapshot(config_file), None, 0o600))
         apply_changes(changes)
@@ -283,7 +283,7 @@ def connection(config):
 
 
 def install(args):
-    print(f"AgentWatch {VERSION} installer\n\nDetected:")
+    print(f"SlopWatchDeluxe {VERSION} installer\n\nDetected:")
     detected = {p: detect(p) for p in ADAPTERS}
     for p, info in detected.items():
         print(f"  [{'x' if info['path'] else ' '}] {p}: {info['path'] or 'not found'}\n      {info['version']}")
@@ -319,7 +319,7 @@ def install(args):
     for p in providers:
         print(f"{p} hooks: configured ({config['integrations'][p]['path']})")
     if "codex" in providers:
-        print("\nACTION REQUIRED: Start codex, open /hooks, and review/trust the AgentWatch commands.\n"
+        print("\nACTION REQUIRED: Start codex, open /hooks, and review/trust the SlopWatchDeluxe commands.\n"
               "Codex skips new hooks until you trust them. No trust checks have been disabled.")
     print("Start fresh CLI sessions to activate hooks.")
     if str(Path(config["binary"]).parent) not in os.environ.get("PATH", "").split(os.pathsep):
@@ -330,14 +330,14 @@ def install(args):
 
 
 def status():
-    print(f"AgentWatch {VERSION}")
+    print(f"SlopWatchDeluxe {VERSION}")
     config = None
     try:
         config = load_config()
         ok, detail = connection(config)
         print(f"\nServer: {config['url']}\n  reachable: {'yes' if ok else 'no (' + detail + ')'}")
         binary = Path(config.get("binary", ""))
-        print(f"  installed executable: {'yes' if is_agentwatch(binary) else 'missing or invalid'}")
+        print(f"  installed executable: {'yes' if is_slopwatchdeluxe(binary) else 'missing or invalid'}")
     except (OSError, ValueError) as exc:
         print(f"\nConfiguration: {exc}")
     for p in ADAPTERS:

@@ -11,7 +11,7 @@ def build_bytes():
     result = BytesIO()
     result.write(b"#!/usr/bin/env python3\n")
     files = {"__main__.py": b"from client.__main__ import main\nraise SystemExit(main())\n",
-             "agentwatch-build.json": json.dumps({"application": "agentwatch", "version": VERSION}).encode()}
+             "slopwatchdeluxe-build.json": json.dumps({"application": "slopwatchdeluxe", "version": VERSION}).encode()}
     for path in sorted(Path(__file__).parent.glob("*.py")):
         files["client/" + path.name] = path.read_bytes()
     with zipfile.ZipFile(result, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:

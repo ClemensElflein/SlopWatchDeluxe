@@ -1,1 +1,1 @@
-"""AgentWatch server."""
+"""SlopWatchDeluxe server."""

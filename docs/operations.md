@@ -1,6 +1,6 @@
 # Operations and reference
 
-Setup, configuration, lifecycle behavior, and troubleshooting for AgentWatch.
+Setup, configuration, lifecycle behavior, and troubleshooting for SlopWatchDeluxe.
 For a quick start, see the [README](../README.md).
 
 ## Server configuration
@@ -9,10 +9,10 @@ Copy `.env.example` to `.env` to override Compose defaults:
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `AGENTWATCH_PORT` | `8765` | Published host port in Compose; listening port when running the server directly |
-| `AGENTWATCH_ARCHIVE_AFTER_HOURS` | `24` | Positive number of hours without activity before archiving; fractions accepted |
-| `AGENTWATCH_API_TOKEN` | empty | Optional shared API bearer token |
-| `AGENTWATCH_DATABASE` | `/data/agentwatch.db` in Docker | SQLite file; Compose deliberately keeps this inside the volume |
+| `SLOPWATCHDELUXE_PORT` | `8765` | Published host port in Compose; listening port when running the server directly |
+| `SLOPWATCHDELUXE_ARCHIVE_AFTER_HOURS` | `24` | Positive number of hours without activity before archiving; fractions accepted |
+| `SLOPWATCHDELUXE_API_TOKEN` | empty | Optional shared API bearer token |
+| `SLOPWATCHDELUXE_DATABASE` | `/data/slopwatchdeluxe.db` in Docker | SQLite file; Compose deliberately keeps this inside the volume |
 
 Apply changes with `docker compose up -d`. For a different database filename,
 edit the Compose service environment and keep the file under `/data`.
@@ -21,7 +21,7 @@ workers or replicas against the same SQLite file.
 
 ### API token
 
-Set `AGENTWATCH_API_TOKEN` in `.env`, recreate the service, and enter the same
+Set `SLOPWATCHDELUXE_API_TOKEN` in `.env`, recreate the service, and enter the same
 token in the client installer. The browser's **Connection settings** accepts
 the token and stores it in `sessionStorage` for that tab. All session and
 event APIs, including SSE, require `Authorization: Bearer TOKEN`. Health,
@@ -38,8 +38,8 @@ idle connections for more than 35 seconds. Serve the app at the domain root.
 
 ### Persistence and archiving
 
-The Compose volume `agentwatch-data` (usually named
-`agentwatch_agentwatch-data` or prefixed by your checkout directory) contains
+The Compose volume `slopwatchdeluxe-data` (named
+`slopwatchdeluxe_slopwatchdeluxe-data` with the supplied `compose.yaml`) contains
 SQLite and its WAL files. Restarting or recreating the container preserves
 sessions and their states. `docker compose down` keeps the volume;
 **`docker compose down -v` deletes it**.
@@ -55,17 +55,17 @@ For a consistent backup, stop the service before copying the volume, or use
 SQLite's backup API inside the container:
 
 ```bash
-docker compose exec agentwatch python -c 'import sqlite3; sqlite3.connect("/data/agentwatch.db").backup(sqlite3.connect("/data/backup.db"))'
-docker compose cp agentwatch:/data/backup.db ./agentwatch-backup.db
+docker compose exec slopwatchdeluxe python -c 'import sqlite3; sqlite3.connect("/data/slopwatchdeluxe.db").backup(sqlite3.connect("/data/backup.db"))'
+docker compose cp slopwatchdeluxe:/data/backup.db ./slopwatchdeluxe-backup.db
 ```
 
 ## Client and installer
 
 ```bash
-agentwatch status
-agentwatch test
-agentwatch install       # safely repeat to change endpoint/token or update hooks
-agentwatch uninstall
+slopwatchdeluxe status
+slopwatchdeluxe test
+slopwatchdeluxe install       # safely repeat to change endpoint/token or update hooks
+slopwatchdeluxe uninstall
 ```
 
 `test` adds a clearly labeled harmless ATTENTION card that you can delete.
@@ -73,9 +73,9 @@ agentwatch uninstall
 handlers. Codex trust and managed policy must be checked in the provider UI;
 configuration inspection cannot prove hooks have actually fired.
 
-Installation copies the zipapp to `~/.local/bin/agentwatch` and saves its
-settings/ownership record in `$XDG_CONFIG_HOME/agentwatch/config.json`, default
-`~/.config/agentwatch/config.json`. The config is mode `0600`, including the
+Installation copies the zipapp to `~/.local/bin/slopwatchdeluxe` and saves its
+settings/ownership record in `$XDG_CONFIG_HOME/slopwatchdeluxe/config.json`, default
+`~/.config/slopwatchdeluxe/config.json`. The config is mode `0600`, including the
 token. Hook commands use the Python interpreter and quoted absolute paths
 selected during installation, so they work even if `.local/bin` is absent
 from PATH. To use the convenience commands, add:
@@ -90,13 +90,13 @@ removed, reinstall. Native Windows installation is not supported; use WSL.
 For scripted installation with detected supported tools:
 
 ```bash
-python3 agentwatch.pyz install --yes --url http://SERVER:8765 \
-  --provider codex --provider claude --token-env AGENTWATCH_TOKEN
+python3 slopwatchdeluxe.pyz install --yes --url http://SERVER:8765 \
+  --provider codex --provider claude --token-env SLOPWATCHDELUXE_TOKEN
 ```
 
-Set `AGENTWATCH_TOKEN` in the calling environment; omit `--token-env` if no
+Set `SLOPWATCHDELUXE_TOKEN` in the calling environment; omit `--token-env` if no
 token is needed. Interactive Enter keeps an existing token; `-` clears it.
-Reinstalling with a different provider selection removes AgentWatch hooks
+Reinstalling with a different provider selection removes SlopWatchDeluxe hooks
 for deselected providers. Uninstall uses the saved provider paths, even when
 the CLI is no longer on PATH. If you intentionally change `CODEX_HOME` or
 `CLAUDE_CONFIG_DIR`, rerun install under that environment.
@@ -107,10 +107,10 @@ Symlinked config files are refused to avoid changing dotfile manager targets
 unexpectedly. Use regular files for automated edits. Updates are atomic per
 file, with best-effort rollback on write failure and concurrent-edit detection.
 Avoid editing provider settings concurrently with installation. Original bytes
-are backed up beside each changed file as `.agentwatch-backup-TIMESTAMP`, mode
+are backed up beside each changed file as `.slopwatchdeluxe-backup-TIMESTAMP`, mode
 `0600`. Byte-identical repeat installs create no additional backups.
 
-Uninstall removes only recorded AgentWatch handlers and its binary/config,
+Uninstall removes only recorded SlopWatchDeluxe handlers and its binary/config,
 preserves unrelated settings and hooks added since installation, and retains
 backups. Inspect backups before restoring one manually: replacing an entire
 provider file would also roll back unrelated edits. Backups may contain tokens;
@@ -138,7 +138,7 @@ Adapters convert provider payloads into provider-neutral facts. The server
 applies transitions; changing the state model does not require reinstalling
 clients. Provider API changes can still require a client update. Git identity
 is read cheaply at session start, never by invoking git on every tool call.
-AgentWatch does not read transcripts or elicitation answers.
+SlopWatchDeluxe does not read transcripts or elicitation answers.
 
 Limitations to understand:
 
@@ -150,7 +150,7 @@ Limitations to understand:
 - Permission approval itself has no separate event. A matching tool completion
   clears the wait, so a long approved tool can keep displaying attention until
   it returns. Matching by tool name is ambiguous for concurrent identical tools.
-- Another Stop hook can continue a turn. AgentWatch may briefly show completion
+- Another Stop hook can continue a turn. SlopWatchDeluxe may briefly show completion
   until the next prompt/tool event. Subagent completion does not finish the
   parent; human requests from Claude subagents appear on its parent card.
 - Hooks use short synchronous calls: 0.8-second socket timeout, 1.2-second total
@@ -225,8 +225,8 @@ session data or token. Tokenless deployments should remain on a trusted LAN.
 
 ```bash
 python3 scripts/build-zipapp.py
-./dist/agentwatch.pyz --version
-python3 dist/agentwatch.pyz install
+./dist/slopwatchdeluxe.pyz --version
+python3 dist/slopwatchdeluxe.pyz install
 ```
 
 The builder uses sorted entries, fixed timestamps/permissions, and the standard
@@ -245,15 +245,15 @@ python3 scripts/smoke-test.py http://localhost:8765
 The smoke test installs into a temporary HOME with fake provider executables,
 runs the actual installed hook commands against the live server, verifies
 transitions/SSE/archive/restore/delete, and uninstalls. It removes only its own
-test sessions. Set `AGENTWATCH_TEST_TOKEN` when testing a protected server.
+test sessions. Set `SLOPWATCHDELUXE_TEST_TOKEN` when testing a protected server.
 Automated tests never modify your real provider configuration.
 
 For local server development: `.venv/bin/python -m server`. Data defaults to
-`./data/agentwatch.db` outside Docker. No frontend build or Node service exists.
+`./data/slopwatchdeluxe.db` outside Docker. No frontend build or Node service exists.
 
 ## Troubleshooting
 
-- **No cards:** Run `agentwatch status`, then `agentwatch test`. Check endpoint,
+- **No cards:** Run `slopwatchdeluxe status`, then `slopwatchdeluxe test`. Check endpoint,
   token, firewall, and `docker compose logs --tail=100`. Use your server's LAN
   address on other machines; their `localhost` is not your server.
 - **Codex is open but has no card yet:** Codex CLI 0.154.0 defers its
@@ -267,12 +267,26 @@ For local server development: `.venv/bin/python -m server`. Data defaults to
 - **Disconnected browser:** Verify the server and any proxy's SSE settings.
   The browser retries automatically; the last loaded cards remain visible.
 - **State looks stale:** Inspect its last-activity time and the provider
-  limitations above. AgentWatch cannot recover a dropped offline event.
+  limitations above. SlopWatchDeluxe cannot recover a dropped offline event.
   Acknowledge or archive manually, or submit another prompt to produce a fresh
   lifecycle event.
 - **Malformed config or symlink:** Installer stops before rewriting target
   config. Repair the file or use a regular config file, then rerun install.
-- **Port already used:** Set `AGENTWATCH_PORT` in `.env` and recreate the service.
+- **Port already used:** Set `SLOPWATCHDELUXE_PORT` in `.env` and recreate the service.
 - **Permission denied for a bind-mounted database:** The container runs as
   UID/GID 10001. Prefer the supplied named volume, or make your bind mount
   writable by that UID. Do not run the service as root just to bypass it.
+
+## Upgrading from AgentWatch
+
+The Compose file is now `compose.yaml`. The Compose project, service, and
+container are named `slopwatchdeluxe`; the image is
+`ghcr.io/clemenselflein/slopwatchdeluxe:latest`. Remove or update old
+`docker-compose.yml` files and stop the old service before starting the new one.
+
+Before switching, run the old `agentwatch uninstall` command to remove its
+managed hooks, then install the new `slopwatchdeluxe.pyz` client. Use the same
+server URL and token. Rename server environment variables from `AGENTWATCH_`
+to `SLOPWATCHDELUXE_`. To preserve existing sessions, attach the existing Docker
+data volume and set `SLOPWATCHDELUXE_DATABASE` to its existing `/data/agentwatch.db`
+file. The new default volume and database names otherwise start a fresh database.

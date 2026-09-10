@@ -8,7 +8,7 @@ def config_path():
     root = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
     if not root.is_absolute():
         root = Path.home() / ".config"
-    return root / "agentwatch" / "config.json"
+    return root / "slopwatchdeluxe" / "config.json"
 
 
 def unique_object(pairs):
@@ -25,7 +25,7 @@ def read_json(path, missing=False):
     if not path.exists():
         if missing:
             return {}
-        raise ValueError(f"Missing configuration: {path}. Run agentwatch install.")
+        raise ValueError(f"Missing configuration: {path}. Run slopwatchdeluxe install.")
     if not path.is_file() or path.stat().st_size > 4 * 1024 * 1024:
         raise ValueError(f"Not a regular configuration file, or exceeds 4 MiB: {path}")
     value = json.loads(path.read_text(), object_pairs_hook=unique_object)

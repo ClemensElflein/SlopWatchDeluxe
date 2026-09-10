@@ -8,7 +8,7 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 def request(config, path, data=None, timeout=0.8, method=None):
-    headers = {"Accept": "application/json", "User-Agent": "AgentWatch/0.1.0"}
+    headers = {"Accept": "application/json", "User-Agent": "SlopWatchDeluxe/0.1.0"}
     if config.get("token"):
         headers["Authorization"] = "Bearer " + config["token"]
     body = None

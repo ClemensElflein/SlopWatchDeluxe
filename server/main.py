@@ -21,19 +21,19 @@ MAX_BODY = 65536
 
 @dataclass
 class Settings:
-    database: str = "data/agentwatch.db"
+    database: str = "data/slopwatchdeluxe.db"
     archive_after_hours: float = 24
     api_token: str = ""
 
     def __post_init__(self):
         if not math.isfinite(self.archive_after_hours) or self.archive_after_hours <= 0:
-            raise ValueError("AGENTWATCH_ARCHIVE_AFTER_HOURS must be a positive finite number")
+            raise ValueError("SLOPWATCHDELUXE_ARCHIVE_AFTER_HOURS must be a positive finite number")
 
     @classmethod
     def from_env(cls):
-        return cls(os.getenv("AGENTWATCH_DATABASE", "data/agentwatch.db"),
-                   float(os.getenv("AGENTWATCH_ARCHIVE_AFTER_HOURS", "24")),
-                   os.getenv("AGENTWATCH_API_TOKEN", ""))
+        return cls(os.getenv("SLOPWATCHDELUXE_DATABASE", "data/slopwatchdeluxe.db"),
+                   float(os.getenv("SLOPWATCHDELUXE_ARCHIVE_AFTER_HOURS", "24")),
+                   os.getenv("SLOPWATCHDELUXE_API_TOKEN", ""))
 
 
 class RequestGuard:
@@ -122,7 +122,7 @@ def create_app(settings=None):
                 await permission_task
             db.close()
 
-    app = FastAPI(title="AgentWatch", version=VERSION, lifespan=lifespan, docs_url=None, redoc_url=None)
+    app = FastAPI(title="SlopWatchDeluxe", version=VERSION, lifespan=lifespan, docs_url=None, redoc_url=None)
     app.add_middleware(RequestGuard, token=settings.api_token)
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
@@ -138,12 +138,12 @@ def create_app(settings=None):
     def index():
         return FileResponse(STATIC / "index.html")
 
-    @app.get("/agentwatch.pyz", include_in_schema=False)
+    @app.get("/slopwatchdeluxe.pyz", include_in_schema=False)
     def client_download():
-        artifact = Path(__file__).resolve().parent.parent / "dist" / "agentwatch.pyz"
+        artifact = Path(__file__).resolve().parent.parent / "dist" / "slopwatchdeluxe.pyz"
         if not artifact.is_file():
             raise HTTPException(404, "Build the client with python scripts/build-zipapp.py")
-        return FileResponse(artifact, filename="agentwatch.pyz", media_type="application/octet-stream")
+        return FileResponse(artifact, filename="slopwatchdeluxe.pyz", media_type="application/octet-stream")
 
     @app.get("/api/v1/health")
     def health():

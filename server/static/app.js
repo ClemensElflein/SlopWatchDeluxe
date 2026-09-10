@@ -1,6 +1,6 @@
 'use strict';
 const $ = id => document.getElementById(id);
-let token = sessionStorage.getItem('agentwatch-token') || '';
+let token = sessionStorage.getItem('slopwatchdeluxe-token') || '';
 let active = [], archived = [], filter = 'all', provider = 'all', search = '';
 let controller, generation = 0, refreshRunning = false, refreshAgain = false;
 const labels = {permission_required:'Permission required',input_required:'Input required',turn_finished:'Turn completed',failed:'Failed',interrupted:'Interrupted',manual:'Needs attention'};
@@ -123,7 +123,7 @@ function render() {
   $('working-count').textContent = counts.WORKING;
   $('idle-count').textContent = counts.IDLE;
   $('total-count').textContent = active.filter(s => s.state !== 'CLOSED').length;
-  document.title = counts.ATTENTION ? `(${counts.ATTENTION}) AgentWatch` : 'AgentWatch';
+  document.title = counts.ATTENTION ? `(${counts.ATTENTION}) SlopWatchDeluxe` : 'SlopWatchDeluxe';
   const rows = (filter === 'archived' ? archived : active).filter(s =>
     (filter === 'archived' || (filter === 'all' ? s.state !== 'CLOSED' : s.state === filter)) &&
     (provider === 'all' || s.provider === provider) &&
@@ -143,7 +143,7 @@ function render() {
     const firstRun = !active.length && !archived.length && filter === 'all' && !search;
     empty.append(node('div','empty-icon',firstRun ? '⌁' : '✓'),node('h2','',firstRun ? 'Your agents will appear here.' : 'Nothing needs your attention here.'));
     empty.append(node('p','',firstRun ? 'Download the hook client, install it on your development machine, then launch Codex or Claude as usual.' : 'No sessions match this view. Updates arrive automatically as your agents work.'));
-    if (firstRun) empty.append(node('code','', 'python3 agentwatch.pyz install'));
+    if (firstRun) empty.append(node('code','', 'python3 slopwatchdeluxe.pyz install'));
     fragment.append(empty);
   }
   // All provider content enters through textContent, never HTML.
@@ -197,8 +197,8 @@ $('provider').addEventListener('change', event => {provider = event.target.value
 $('search').addEventListener('input', event => {search = event.target.value.toLowerCase(); render();});
 $('settings-button').addEventListener('click', () => { $('settings').hidden = !$('settings').hidden; if (!$('settings').hidden) $('token').focus(); });
 $('token-form').addEventListener('submit', event => {
-  event.preventDefault(); token = $('token').value.trim(); sessionStorage.setItem('agentwatch-token',token); $('token').value = ''; $('settings').hidden = true; refresh(); stream();
+  event.preventDefault(); token = $('token').value.trim(); sessionStorage.setItem('slopwatchdeluxe-token',token); $('token').value = ''; $('settings').hidden = true; refresh(); stream();
 });
-$('clear-token').addEventListener('click', () => {token = ''; sessionStorage.removeItem('agentwatch-token'); $('token').value = ''; refresh(); stream();});
+$('clear-token').addEventListener('click', () => {token = ''; sessionStorage.removeItem('slopwatchdeluxe-token'); $('token').value = ''; refresh(); stream();});
 setInterval(() => document.querySelectorAll('time.age').forEach(time => {time.textContent = age(time.dateTime);}),5000);
 refresh(); stream();
