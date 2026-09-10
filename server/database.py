@@ -8,7 +8,7 @@ import threading
 from uuid import uuid4
 
 from .models import Event, SessionCreate, iso, utcnow
-from .state_machine import transition
+from .state_machine import promote_permissions, transition
 
 
 def project_name(cwd):
@@ -129,21 +129,22 @@ class Database:
             row = self.conn.execute(
                 "SELECT * FROM sessions WHERE provider=? AND hostname=? AND provider_session_id=?",
                 (data.provider, data.hostname, data.provider_session_id)).fetchone()
-            now = iso(utcnow())
+            received_at = utcnow()
+            now = iso(received_at)
             stamp = min(iso(data.timestamp), now)
             session = self.decode(row) if row else self.new(SessionCreate(
                 **data.model_dump(include={"provider", "provider_session_id", "hostname", "cwd"})), now)
             if (session["last_event_id"] == data.event_id or
                     (session["last_event_at"] and stamp < session["last_event_at"])):
                 return self.public(session)
-            transition(session, data.event, data.metadata)
+            transition(session, data.event, data.metadata, now=received_at, message=data.message)
             session["metadata"].update(data.metadata)
             session["metadata"]["last_event"] = data.event
             if data.cwd:
                 if not session["metadata"].get("_custom_project"):
                     session["project_name"] = project_name(data.cwd)
                 session["cwd"] = data.cwd
-            if data.message and data.event not in ("tool_started", "tool_finished", "activity"):
+            if data.message and data.event not in ("tool_started", "tool_finished", "activity", "permission_required"):
                 session["last_message"] = data.message
             if data.event == "work_started":
                 session["metadata"]["last_user_prompt"] = data.message
@@ -153,6 +154,21 @@ class Database:
                            last_event_at=stamp, last_event_id=data.event_id)
             self.save(session)
             return self.public(session)
+
+    def settle_permissions(self, now=None):
+        now = now or utcnow()
+        changed = 0
+        with self.transaction():
+            rows = self.conn.execute(
+                "SELECT * FROM sessions WHERE archived_at IS NULL "
+                "AND json_type(metadata, '$._pending_permissions') = 'object'").fetchall()
+            for row in rows:
+                session = self.decode(row)
+                if promote_permissions(session, now):
+                    session["updated_at"] = iso(now)
+                    self.save(session)
+                    changed += 1
+        return changed
 
     def patch(self, session_id, changes):
         with self.transaction():
@@ -164,6 +180,7 @@ class Database:
             if "state" in changes:
                 session["attention_reason"] = "manual" if session["state"] == "ATTENTION" else None
                 session["metadata"].pop("_waits", None)
+                session["metadata"].pop("_pending_permissions", None)
             session["updated_at"] = iso(utcnow())
             self.save(session)
             return self.public(session)

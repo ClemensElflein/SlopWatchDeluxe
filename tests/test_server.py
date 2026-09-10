@@ -8,6 +8,7 @@ import pytest
 
 from server.main import Settings, create_app
 from server.models import utcnow
+from server.state_machine import PERMISSION_GRACE_SECONDS
 
 
 def event(api, name, **overrides):
@@ -45,7 +46,7 @@ def test_event_creates_and_transitions(api):
     assert event(api, "session_started")["state"] == "IDLE"
 
 
-@pytest.mark.parametrize("name", ["permission_required", "input_required", "failed", "interrupted"])
+@pytest.mark.parametrize("name", ["input_required", "failed", "interrupted"])
 def test_attention_reasons(api, name):
     event(api, "work_started")
     result = event(api, name)
@@ -53,9 +54,10 @@ def test_attention_reasons(api, name):
     assert event(api, "work_started")["state"] == "WORKING"
 
 
-def test_permission_wait_survives_unrelated_parallel_activity(api):
+def test_permission_wait_survives_unrelated_parallel_activity(api, app):
     event(api, "work_started")
     event(api, "permission_required", metadata={"tool_name": "Bash"})
+    app.state.db.settle_permissions(utcnow() + timedelta(seconds=PERMISSION_GRACE_SECONDS))
     for name in ("tool_started", "tool_finished", "tool_failed"):
         assert event(api, name, metadata={"tool_name": "Read"})["state"] == "ATTENTION"
     assert event(api, "tool_finished", metadata={"tool_name": "Bash"})["state"] == "WORKING"
@@ -159,3 +161,89 @@ def test_concurrent_identity_upsert(api):
         sessions = list(pool.map(lambda _: event(api, "work_started"), range(20)))
     assert len({s["id"] for s in sessions}) == 1
     assert len(api.get("/api/v1/sessions").json()) == 1
+
+
+@pytest.fixture
+def server_clock(monkeypatch):
+    import server.database as database
+    clock = [utcnow()]
+    monkeypatch.setattr(database, "utcnow", lambda: clock[0])
+    return clock
+
+
+def test_permission_grace_exact_deadline_and_public_state(api, app, server_clock):
+    started = event(api, "work_started", message="Fix it")
+    pending = event(api, "permission_required", message="Run build", metadata={"tool_name": "Bash"})
+    assert pending["state"] == "WORKING" and pending["attention_reason"] is None
+    assert pending["last_message"] == started["last_message"]
+    assert all(not key.startswith("_") for key in pending["metadata"])
+    revision = app.state.db.revision
+    server_clock[0] += timedelta(seconds=PERMISSION_GRACE_SECONDS, microseconds=-1)
+    assert app.state.db.settle_permissions() == 0
+    server_clock[0] += timedelta(microseconds=1)
+    assert app.state.db.settle_permissions() == 1
+    assert app.state.db.revision > revision  # Publishes a change for SSE without another hook.
+    waiting = api.get("/api/v1/sessions/" + pending["id"]).json()
+    assert waiting["state"] == "ATTENTION" and waiting["attention_reason"] == "permission_required"
+    assert waiting["last_message"] == "Run build"
+    assert waiting["last_activity_at"] == pending["last_activity_at"]
+    assert app.state.db.settle_permissions() == 0
+    assert event(api, "tool_finished", metadata={"tool_name": "Bash"})["state"] == "WORKING"
+
+
+@pytest.mark.parametrize("resolution", ["tool_finished", "tool_failed", "input_resolved"])
+def test_automatically_resolved_permission_never_needs_attention(api, app, server_clock, resolution):
+    event(api, "work_started")
+    pending = event(api, "permission_required", metadata={"tool_name": "Bash"})
+    server_clock[0] += timedelta(seconds=PERMISSION_GRACE_SECONDS - 1)
+    resolved = event(api, resolution, metadata={"tool_name": "Bash"})
+    assert resolved["state"] == "WORKING"
+    server_clock[0] += timedelta(seconds=PERMISSION_GRACE_SECONDS + 1)
+    assert app.state.db.settle_permissions() == 0
+    assert api.get("/api/v1/sessions/" + pending["id"]).json()["state"] == "WORKING"
+
+
+def test_repeated_permission_does_not_extend_grace_or_clear_other_wait(api, app, server_clock):
+    event(api, "work_started")
+    event(api, "permission_required", metadata={"tool_name": "Bash"})
+    server_clock[0] += timedelta(seconds=PERMISSION_GRACE_SECONDS - 2)
+    event(api, "permission_required", metadata={"tool_name": "Bash"})
+    event(api, "input_required", metadata={"tool_name": "AskUserQuestion"})
+    server_clock[0] += timedelta(seconds=2)
+    assert app.state.db.settle_permissions() == 1
+    waiting = event(api, "tool_finished", metadata={"tool_name": "Bash"})
+    assert waiting["state"] == "ATTENTION" and waiting["attention_reason"] == "input_required"
+    assert event(api, "tool_finished", metadata={"tool_name": "AskUserQuestion"})["state"] == "WORKING"
+
+
+@pytest.mark.parametrize("next_event, expected", [("work_started", "WORKING"), ("session_started", "IDLE"),
+    ("turn_finished", "ATTENTION"), ("failed", "ATTENTION"), ("interrupted", "ATTENTION"), ("session_ended", "CLOSED")])
+def test_new_lifecycle_cancels_pending_permissions(api, app, server_clock, next_event, expected):
+    event(api, "permission_required", metadata={"tool_name": "Bash"})
+    result = event(api, next_event)
+    server_clock[0] += timedelta(seconds=PERMISSION_GRACE_SECONDS + 1)
+    assert app.state.db.settle_permissions() == 0
+    current = api.get("/api/v1/sessions/" + result["id"]).json()
+    assert current["state"] == expected
+    assert current["attention_reason"] != "permission_required"
+
+
+def test_acknowledgment_cancels_pending_permission(api, app, server_clock):
+    pending = event(api, "permission_required")
+    path = "/api/v1/sessions/" + pending["id"]
+    api.patch(path, json={"state": "IDLE"})
+    server_clock[0] += timedelta(seconds=PERMISSION_GRACE_SECONDS + 1)
+    assert app.state.db.settle_permissions() == 0
+    assert api.get(path).json()["state"] == "IDLE"
+
+
+def test_pending_permissions_survive_server_restart(tmp_path, server_clock):
+    settings = Settings(database=str(tmp_path / "pending.db"))
+    with TestClient(create_app(settings)) as api:
+        pending = event(api, "permission_required", metadata={"tool_name": "Bash"})
+    app = create_app(settings)
+    with TestClient(app) as api:
+        assert api.get("/api/v1/sessions/" + pending["id"]).json()["state"] == "WORKING"
+        server_clock[0] += timedelta(seconds=PERMISSION_GRACE_SECONDS)
+        assert app.state.db.settle_permissions() == 1
+        assert api.get("/api/v1/sessions/" + pending["id"]).json()["attention_reason"] == "permission_required"

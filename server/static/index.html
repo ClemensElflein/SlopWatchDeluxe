@@ -25,14 +25,14 @@
     </section>
     <div id="error" class="error" role="alert" hidden></div>
     <section class="stats" aria-label="Session counts">
-      <button class="stat attention-stat" data-state="ATTENTION"><span><i></i>Needs attention</span><strong id="attention-count">0</strong><small>Your next stop</small></button>
+      <button id="attention-stat" class="stat attention-stat" data-state="ATTENTION"><span><i></i>Needs attention</span><strong id="attention-count">0</strong><small>Your next stop</small></button>
       <button class="stat" data-state="WORKING"><span><i class="working-dot"></i>Working</span><strong id="working-count">0</strong><small>Making progress</small></button>
       <button class="stat" data-state="IDLE"><span><i class="idle-dot"></i>Idle</span><strong id="idle-count">0</strong><small>Ready for a prompt</small></button>
       <div class="stat total-stat"><span>Active sessions</span><strong id="total-count">0</strong><small>Across your machines</small></div>
     </section>
     <div class="toolbar">
       <nav class="filters" aria-label="Filter by session state">
-        <button data-state="all" class="selected" aria-pressed="true">All sessions</button><button data-state="ATTENTION" aria-pressed="false">Attention</button><button data-state="WORKING" aria-pressed="false">Working</button><button data-state="IDLE" aria-pressed="false">Idle</button><button data-state="archived" aria-pressed="false">Archived</button>
+        <button data-state="all" class="selected" aria-pressed="true">Active</button><button data-state="ATTENTION" aria-pressed="false">Attention</button><button data-state="WORKING" aria-pressed="false">Working</button><button data-state="IDLE" aria-pressed="false">Idle</button><button data-state="CLOSED" aria-pressed="false">Closed</button><button data-state="archived" aria-pressed="false">Archived</button>
       </nav>
       <div class="search-filters"><label class="sr-only" for="provider">Provider</label><select id="provider"><option value="all">All providers</option><option value="codex">Codex</option><option value="claude">Claude</option></select><label class="sr-only" for="search">Search projects and machines</label><input id="search" type="search" placeholder="Search projects or machines…"></div>
     </div>

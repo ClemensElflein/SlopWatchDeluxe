@@ -1,307 +1,157 @@
 # AgentWatch
 
-A small, self-hosted attention dashboard for Codex CLI and Claude Code.
-One Python server, one SQLite database, one portable Python client. Keep
-launching `codex` and `claude` normally.
+**This project is fully vibe coded.** The implementation, tests, and documentation
+were written with an AI coding agent, guided by human prompts and iteration.
+It is a personal experiment with rough edges, not a claim of production readiness.
 
-## Quickstart
+AgentWatch is a small, self-hosted dashboard for **Codex CLI** and **Claude Code**.
+See which agents are working, which need your attention, and which are ready for
+a new prompt—all in one browser tab. One Python server, one SQLite database,
+and a portable hook client on each development machine.
 
-On your server, clone this repository (replace the placeholder with its URL):
+![AgentWatch showing completed work, a question, a working agent, and an idle agent](docs/screenshots/active-sessions.png)
 
-```bash
-git clone <this-repository-url> agentwatch
-cd agentwatch
-docker compose up -d
+*Screenshots show the real dashboard with sample sessions.*
+
+## Run with Docker Compose
+
+Copy this into `compose.yaml` on your server:
+
+```yaml
+services:
+  agentwatch:
+    image: ghcr.io/clemenselflein/agentwatch:latest
+    build: https://github.com/ClemensElflein/AgentWatch.git
+    restart: unless-stopped
+    ports:
+      - "8765:8765"
+    environment:
+      AGENTWATCH_DATABASE: /data/agentwatch.db
+      AGENTWATCH_ARCHIVE_AFTER_HOURS: "24"
+      AGENTWATCH_API_TOKEN: ""
+    volumes:
+      - agentwatch-data:/data
+    init: true
+    stop_grace_period: 5s
+
+volumes:
+  agentwatch-data:
 ```
 
-On each development machine, download the client from your server, then install:
+Then run:
 
 ```bash
-curl -fLo agentwatch.pyz http://SERVER:8765/agentwatch.pyz
+docker compose up -d --wait
+```
+
+Open **http://YOUR_SERVER:8765**. Compose pulls the published image, or builds
+from this repository if the image is unavailable. The named volume preserves
+sessions across container restarts. `docker compose down -v` deletes that data.
+
+The empty API token is suitable for a trusted LAN. Set `AGENTWATCH_API_TOKEN` to
+a secret value and use the same token in the client and browser Connection
+settings when authentication is needed. Use HTTPS through a reverse proxy when
+connecting over an untrusted network. Hook messages can include prompts,
+responses, command descriptions, and working directories.
+
+To update a published image:
+
+```bash
+docker compose pull
+docker compose up -d --wait
+```
+
+## Connect your agents
+
+On each development machine, replace `YOUR_SERVER` with your server's address:
+
+```bash
+curl -fLo agentwatch.pyz http://YOUR_SERVER:8765/agentwatch.pyz
 python3 agentwatch.pyz install
 ```
 
-Enter `http://SERVER:8765` when asked. Open **http://SERVER:8765** in your browser.
+The installer asks for the server URL, an optional token, and which detected
+providers to connect. Keep launching `codex` and `claude` as usual.
 
-**Codex activation:** Start Codex, open `/hooks`, and review/trust the AgentWatch
-commands once. Current Codex skips new hooks until this review. AgentWatch
-does not bypass it. Start fresh Codex/Claude sessions after installation.
+- **Codex:** Open `/hooks` and review/trust the AgentWatch commands once. New or
+  changed hooks are skipped until trusted. In Codex CLI 0.154.0, registration
+  happens at the **first prompt**, not when an empty window opens.
+- **Claude Code:** Start a fresh session after installation. Existing hooks are
+  preserved; inspect `/hooks` if the session does not appear.
 
-Client requirements: **Python 3.11+**, Linux, macOS, or WSL. No pip, sudo,
-wrapper, daemon, or third-party Python packages are needed on development
-machines. Supported integration baselines: **Codex CLI 0.154.0+** and
-**Claude Code 2.1.259+**. The installer detects versions and asks you to upgrade
-older or unidentifiable releases instead of installing speculative hooks.
+The client needs **Python 3.11+** on Linux, macOS, or WSL. Supported baselines are
+**Codex CLI 0.154.0+** and **Claude Code 2.1.259+**. No pip dependencies, sudo,
+CLI wrapper, or background discovery service are needed on development machines.
 
-## What you see
+```bash
+agentwatch status       # Check configuration and server connectivity
+agentwatch test         # Send a sample attention card
+agentwatch install      # Update the endpoint, token, or installed hooks
+agentwatch uninstall    # Remove AgentWatch while preserving unrelated hooks
+```
+
+The installer places `agentwatch` in `~/.local/bin`. If that directory is not
+on your PATH, use `~/.local/bin/agentwatch` for the commands above.
+
+## What the dashboard shows
 
 | State | Meaning |
 | --- | --- |
-| ATTENTION | Turn completed, permission/input needed, terminal failure, or observed interruption |
-| WORKING | Processing a prompt or running tools |
-| IDLE | Session opened, or an attention item was acknowledged |
-| CLOSED | Provider reported the session ended |
+| Needs attention | A turn finished, input is needed, or a failure/interruption was reported |
+| Working | Processing a prompt or running tools |
+| Idle | Ready for a prompt, or attention was acknowledged |
+| Closed | The session ended; hidden from Active and available through Closed |
 
-Attention comes first, with recent attention updates at the top. Cards show
-provider, project, hostname, cwd, reason, age, and the latest useful message.
-Filter by state, provider, archived status, or project/machine search. The
-browser title includes the attention count. Live SSE updates reconnect
-automatically. Acknowledge, archive, restore, and delete operate only on
-dashboard records; they do not approve commands or control the agents.
+Permission requests have a **30-second server-side grace period**. Requests that
+resolve during that window never flash an attention alert. Input questions and
+turn completion appear immediately. The Needs attention summary turns yellow
+only when at least one session needs attention.
 
-## Server configuration
+Filter by provider or state, search projects and machines, and acknowledge,
+archive, restore, or delete dashboard records. Live updates reconnect
+automatically. These controls do not approve commands or control the agents.
 
-Copy `.env.example` to `.env` to override Compose defaults:
+Closed sessions stay out of your way, including previous runs in the same
+directory. Select **Closed** to view them:
 
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `AGENTWATCH_PORT` | `8765` | Published host port in Compose; listening port when running the server directly |
-| `AGENTWATCH_ARCHIVE_AFTER_HOURS` | `24` | Positive number of hours without activity before archiving; fractions accepted |
-| `AGENTWATCH_API_TOKEN` | empty | Optional shared API bearer token |
-| `AGENTWATCH_DATABASE` | `/data/agentwatch.db` in Docker | SQLite file; Compose deliberately keeps this inside the volume |
+![The Closed filter shows an earlier session while the attention count is zero and the summary is neutral](docs/screenshots/closed-sessions.png)
 
-Apply changes with `docker compose up -d`. For a different database filename,
-edit the Compose service environment and keep the file under `/data`.
-The server uses one worker. SSE invalidation is in-process; do not run multiple
-workers or replicas against the same SQLite file.
+## Builds and development
 
-### API token
+[The Docker workflow](.github/workflows/docker.yml) runs tests and builds Linux
+AMD64 and ARM64 images on pull requests, pushes to `main`, and version tags.
+Pushes to `main` publish `ghcr.io/clemenselflein/agentwatch:latest`; `v*` tags
+publish versioned images. Pull requests build without publishing. The workflow
+uses GitHub's built-in token for the container registry.
 
-Set `AGENTWATCH_API_TOKEN` in `.env`, recreate the service, and enter the same
-token in the client installer. The browser's **Connection settings** accepts
-the token and stores it in `sessionStorage` for that tab. All session and
-event APIs, including SSE, require `Authorization: Bearer TOKEN`. Health,
-the empty UI shell/static assets, and the generic client download are public.
-There are no user accounts, cookies, or tokens in URLs. The OpenAPI schema at `/openapi.json` describes requests; use your API client
-to set the bearer header.
-
-With no token the API is open to anyone who can reach it, intentionally for
-trusted LAN use. Hook messages may include prompts, responses, cwd, machine
-names, or command descriptions. Use a token and HTTPS through a reverse proxy
-when traffic leaves your trusted network. Reverse proxies must pass the
-Authorization header, permit streaming, disable SSE buffering, and allow
-idle connections for more than 35 seconds. Serve the app at the domain root.
-
-### Persistence and archiving
-
-The Compose volume `agentwatch-data` (usually named
-`agentwatch_agentwatch-data` or prefixed by your checkout directory) contains
-SQLite and its WAL files. Restarting or recreating the container preserves
-sessions and their states. `docker compose down` keeps the volume;
-**`docker compose down -v` deletes it**.
-
-Inactivity is checked on startup and once per minute, based on
-`last_activity_at`. Archived records remain in SQLite and the Archived view.
-Restoring counts as manual activity and grants another full archive interval;
-a new hook event also restores its session automatically. Deleting a record
-is permanent, but a future event for that provider session creates a new card.
-Use archive to retain history. There is no permanent event log or transcript.
-
-For a consistent backup, stop the service before copying the volume, or use
-SQLite's backup API inside the container:
+To build from a checkout:
 
 ```bash
-docker compose exec agentwatch python -c 'import sqlite3; sqlite3.connect("/data/agentwatch.db").backup(sqlite3.connect("/data/backup.db"))'
-docker compose cp agentwatch:/data/backup.db ./agentwatch-backup.db
+git clone https://github.com/ClemensElflein/AgentWatch.git
+cd AgentWatch
+docker compose up -d --build --wait
 ```
 
-## Client and installer
-
-```bash
-agentwatch status
-agentwatch test
-agentwatch install       # safely repeat to change endpoint/token or update hooks
-agentwatch uninstall
-```
-
-`test` adds a clearly labeled harmless ATTENTION card that you can delete.
-`status` checks the server, token, provider paths/versions, and configured hook
-handlers. Codex trust and managed policy must be checked in the provider UI;
-configuration inspection cannot prove hooks have actually fired.
-
-Installation copies the zipapp to `~/.local/bin/agentwatch` and saves its
-settings/ownership record in `$XDG_CONFIG_HOME/agentwatch/config.json`, default
-`~/.config/agentwatch/config.json`. The config is mode `0600`, including the
-token. Hook commands use the Python interpreter and quoted absolute paths
-selected during installation, so they work even if `.local/bin` is absent
-from PATH. To use the convenience commands, add:
-
-```bash
-export PATH="$HOME/.local/bin:$PATH"
-```
-
-Use a durable system Python interpreter to install; if that interpreter is
-removed, reinstall. Native Windows installation is not supported; use WSL.
-
-For scripted installation with detected supported tools:
-
-```bash
-python3 agentwatch.pyz install --yes --url http://SERVER:8765 \
-  --provider codex --provider claude --token-env AGENTWATCH_TOKEN
-```
-
-Set `AGENTWATCH_TOKEN` in the calling environment; omit `--token-env` if no
-token is needed. Interactive Enter keeps an existing token; `-` clears it.
-Reinstalling with a different provider selection removes AgentWatch hooks
-for deselected providers. Uninstall uses the saved provider paths, even when
-the CLI is no longer on PATH. If you intentionally change `CODEX_HOME` or
-`CLAUDE_CONFIG_DIR`, rerun install under that environment.
-
-Before changes, the installer validates all target JSON, rejects duplicate
-keys and invalid hook nesting, and detects unrelated executable collisions.
-Symlinked config files are refused to avoid changing dotfile manager targets
-unexpectedly. Use regular files for automated edits. Updates are atomic per
-file, with best-effort rollback on write failure and concurrent-edit detection.
-Avoid editing provider settings concurrently with installation. Original bytes
-are backed up beside each changed file as `.agentwatch-backup-TIMESTAMP`, mode
-`0600`. Byte-identical repeat installs create no additional backups.
-
-Uninstall removes only recorded AgentWatch handlers and its binary/config,
-preserves unrelated settings and hooks added since installation, and retains
-backups. Inspect backups before restoring one manually: replacing an entire
-provider file would also roll back unrelated edits. Backups may contain tokens;
-remove them manually when you no longer need them. The installer lock file is
-harmless and remains in the configuration directory.
-
-## Provider integrations and inference
-
-The researched contracts, exact event mapping, sources, and limitations are
-in [docs/provider-hooks.md](docs/provider-hooks.md).
-
-**Codex:** Adds handlers to `$CODEX_HOME/hooks.json`, default
-`~/.codex/hooks.json`. Preserves existing JSON hooks, inline TOML hooks, and
-legacy `notify` commands. Existing inline TOML plus JSON may produce Codex's
-multiple-source warning; both still load. Open `/hooks` to trust new or changed
-commands. Disabled hooks or managed-only policies must be resolved in Codex.
-
-**Claude:** Merges handlers into `$CLAUDE_CONFIG_DIR/settings.json`, default
-`~/.claude/settings.json`. Session start/prompt/tool/permission/stop/end events
-cover the main lifecycle. AskUserQuestion, ExitPlanMode, MCP elicitation, and
-selected notifications cover input waits. StopFailure covers terminal API
-errors. Existing hooks are retained.
-
-Adapters convert provider payloads into provider-neutral facts. The server
-applies transitions; changing the state model does not require reinstalling
-clients. Provider API changes can still require a client update. Git identity
-is read cheaply at session start, never by invoking git on every tool call.
-AgentWatch does not read transcripts or elicitation answers.
-
-Limitations to understand:
-
-- Codex does not expose a general terminal API-error hook or dedicated MCP
-  elicitation hook in the researched contract. Its input-tool detection is a
-  heuristic. These cannot be made perfectly observable using only its hooks.
-- Claude does not have a general interrupt hook; an interrupted tool failure
-  is only partial coverage. SIGKILL/crashes cannot reliably report session end.
-- Permission approval itself has no separate event. A matching tool completion
-  clears the wait, so a long approved tool can keep displaying attention until
-  it returns. Matching by tool name is ambiguous for concurrent identical tools.
-- Another Stop hook can continue a turn. AgentWatch may briefly show completion
-  until the next prompt/tool event. Subagent completion does not finish the
-  parent; human requests from Claude subagents appear on its parent card.
-- Hooks use short synchronous calls: 0.8-second socket timeout, 1.2-second total
-  Unix deadline, 2-second provider timeout. Offline events are dropped silently;
-  there is no retry spool. Missing/malformed/oversized input never makes a
-  handled hook deny an operation. A dead server can add about one second to
-  each hook call until you restore connectivity or disable the integration.
-- Events are ordered using capture timestamps. Keep machine clocks synchronized.
-  Older events and duplicate most-recent event IDs are ignored. This is an
-  attention snapshot, not a durable, exactly-once audit system.
-- Hooks are not heartbeats. Long model responses or commands may have no activity
-  events for a while. Age is shown explicitly; no elapsed-time guess turns a
-  running session into a successful completion. The archive threshold applies
-  to every state, including a task running silently for more than 24 hours.
-
-## REST API
-
-OpenAPI schema: `/openapi.json`. All routes below use JSON.
-
-| Method | Endpoint | Purpose |
-| --- | --- | --- |
-| POST | `/api/v1/sessions` | Create explicitly; duplicate compound identity returns 409 |
-| GET | `/api/v1/sessions` | Active records by default |
-| GET | `/api/v1/sessions/{id}` | Read one record |
-| PATCH | `/api/v1/sessions/{id}` | Set project name, state (including acknowledgment), or last message |
-| DELETE | `/api/v1/sessions/{id}` | Permanently delete; returns 204 |
-| POST | `/api/v1/events` | Apply a normalized event; upsert missing session |
-| POST | `/api/v1/sessions/{id}/archive` | Archive manually |
-| POST | `/api/v1/sessions/{id}/restore` | Restore manually |
-| GET | `/api/v1/health` | Check application/database health |
-| GET | `/api/v1/stream` | SSE change notifications; refetch sessions on change |
-
-List query parameters: `archived=true`, `state=ATTENTION`, `provider=claude`,
-`search=project`, `limit=1000` (maximum), `offset=0`. The UI follows pagination.
-`archived=true` selects archived records only. Compound identity is
-`provider + hostname + provider_session_id`; give your machines distinct names.
-
-```bash
-curl -X POST http://SERVER:8765/api/v1/events \
-  -H 'Content-Type: application/json' \
-  -d '{"provider":"codex","provider_session_id":"example","hostname":"devbox","cwd":"/work/demo","event":"turn_finished","message":"Finished the requested work."}'
-```
-
-Add `Authorization: Bearer TOKEN` if configured. `event_id` and `timestamp`
-(timezone required) are optional for manual producers; the client supplies
-both. Accepted events: `session_started`, `work_started`, `tool_started`,
-`tool_finished`, `tool_failed`, `activity`, `permission_required`,
-`input_required`, `input_resolved`, `turn_finished`, `failed`, `interrupted`,
-`session_ended`. Provider-specific names such as `Stop` are not accepted.
-
-Requests must be JSON and at most 64 KiB, including chunked requests. Messages
-are capped at 8,000 characters and per-event metadata at 16 KiB; accumulated
-metadata is bounded. Agent text is rendered as text, never HTML. The web API
-does not expose local files or execute agent data. Health responses reveal no
-session data or token. Tokenless deployments should remain on a trusted LAN.
-
-## Build and develop
-
-```bash
-python3 scripts/build-zipapp.py
-./dist/agentwatch.pyz --version
-python3 dist/agentwatch.pyz install
-```
-
-The builder uses sorted entries, fixed timestamps/permissions, and the standard
-library. Identical source and Python/zlib toolchain produce identical zipapp
-bytes. Docker builds its own client artifact; rebuild the image after editing
-client or server source with `docker compose up -d --build`.
+To run the tests:
 
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -e '.[test]'
 .venv/bin/pytest -q
-docker compose up -d --build --wait
-python3 scripts/smoke-test.py http://localhost:8765
 ```
 
-The smoke test installs into a temporary HOME with fake provider executables,
-runs the actual installed hook commands against the live server, verifies
-transitions/SSE/archive/restore/delete, and uninstalls. It removes only its own
-test sessions. Set `AGENTWATCH_TEST_TOKEN` when testing a protected server.
-Automated tests never modify your real provider configuration.
+Docker builds the downloadable client automatically. To build it separately,
+run `python3 scripts/build-zipapp.py`. For local server development, run
+`.venv/bin/python -m server`.
 
-For local server development: `.venv/bin/python -m server`. Data defaults to
-`./data/agentwatch.db` outside Docker. No frontend build or Node service exists.
+## Limits and reference
 
-## Troubleshooting
+Hook events are snapshots, not a complete audit log. Offline events are dropped;
+crashes can leave stale sessions. Long-running approved tools can still appear
+to need permission after the grace period because the provider has no separate
+approval-granted hook. AgentWatch does not read transcripts or run a background
+process monitor. Inactivity archives sessions after 24 hours by default.
 
-- **No cards:** Run `agentwatch status`, then `agentwatch test`. Check endpoint,
-  token, firewall, and `docker compose logs --tail=100`. Use your server's LAN
-  address on other machines; their `localhost` is not your server.
-- **Test card works but CLI does not:** Start a fresh session. In Codex use
-  `/hooks` to review/trust definitions. In Claude inspect `/hooks` and
-  `disableAllHooks`. Check custom config directories and organization policy.
-- **Token rejected:** Update both installer config and browser Connection
-  settings. The healthcheck intentionally works without authentication.
-- **Disconnected browser:** Verify the server and any proxy's SSE settings.
-  The browser retries automatically; the last loaded cards remain visible.
-- **State looks stale:** Inspect its last-activity time and the provider
-  limitations above. AgentWatch cannot recover a dropped offline event.
-  Acknowledge or archive manually, or submit another prompt to produce a fresh
-  lifecycle event.
-- **Malformed config or symlink:** Installer stops before rewriting target
-  config. Repair the file or use a regular config file, then rerun install.
-- **Port already used:** Set `AGENTWATCH_PORT` in `.env` and recreate the service.
-- **Permission denied for a bind-mounted database:** The container runs as
-  UID/GID 10001. Prefer the supplied named volume, or make your bind mount
-  writable by that UID. Do not run the service as root just to bypass it.
+- [Configuration, persistence, client installation, API, and troubleshooting](docs/operations.md)
+- [Provider hooks, state mapping, and coverage limits](docs/provider-hooks.md)
+- [Verification notes](docs/verification.md)

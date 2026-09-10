@@ -118,12 +118,14 @@ function render() {
   const counts = {};
   for (const state of ['ATTENTION','WORKING','IDLE']) counts[state] = active.filter(s => s.state === state).length;
   $('attention-count').textContent = counts.ATTENTION;
+  $('attention-stat').classList.toggle('has-attention', counts.ATTENTION > 0);
+  $('attention-stat').querySelector('small').textContent = counts.ATTENTION ? 'Your next stop' : 'All clear';
   $('working-count').textContent = counts.WORKING;
   $('idle-count').textContent = counts.IDLE;
   $('total-count').textContent = active.filter(s => s.state !== 'CLOSED').length;
   document.title = counts.ATTENTION ? `(${counts.ATTENTION}) AgentWatch` : 'AgentWatch';
   const rows = (filter === 'archived' ? archived : active).filter(s =>
-    (['all','archived'].includes(filter) || s.state === filter) &&
+    (filter === 'archived' || (filter === 'all' ? s.state !== 'CLOSED' : s.state === filter)) &&
     (provider === 'all' || s.provider === provider) &&
     `${s.project_name} ${s.cwd} ${s.hostname}`.toLowerCase().includes(search));
   const fragment = document.createDocumentFragment();

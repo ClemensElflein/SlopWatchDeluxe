@@ -53,7 +53,7 @@ def main():
                 cmd = installed["integrations"][provider]["command"]
                 for hook, state, extra in (("SessionStart", "IDLE", {}),
                                            ("UserPromptSubmit", "WORKING", {"prompt": "Smoke test"}),
-                                           ("PermissionRequest", "ATTENTION", {"tool_name": "Bash"}),
+                                           ("PermissionRequest", "WORKING", {"tool_name": "Bash"}),
                                            ("PostToolUse", "WORKING", {"tool_name": "Bash"}),
                                            ("Stop", "ATTENTION", {"last_assistant_message": "Smoke test completed"}),
                                            ("UserPromptSubmit", "WORKING", {}),

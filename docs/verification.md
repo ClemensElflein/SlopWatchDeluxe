@@ -35,3 +35,23 @@ full lifecycle transitions were exercised using representative documented
 payloads through the installed hook commands. Actual interactive model runs
 remain subject to the hook trust/policy and coverage limits in
 [provider-hooks.md](provider-hooks.md).
+
+
+## Follow-up verification (2026-09-10)
+
+- 61 pytest tests passed after adding the 30-second permission grace period.
+  Coverage includes exact expiration, automatic resolution without attention,
+  repeated requests, unrelated waits, lifecycle cancellation, acknowledgment,
+  and persistence across server restart.
+- Browser checks on an isolated server confirmed Closed cards are hidden in
+  Active and visible through Closed; the attention summary is neutral at zero,
+  yellow after an unresolved permission timer expires, and neutral after the
+  matching completion. The timed transition arrived via SSE without another
+  provider event. Card entrance animations no longer replay on each update.
+- Rebuilt and restarted the local Compose service. Authenticated packaged-client
+  lifecycle and SSE smoke checks passed; existing session records were retained
+  and temporary diagnostic records were removed.
+- Actual idle Codex CLI 0.154.0 launches did not run SessionStart before a prompt,
+  despite active/trusted hooks. SessionEnd ran on quit. No model prompts were
+  submitted by these diagnostics. Immediate launch discovery remains separate
+  from the hook-only integration.

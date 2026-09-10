@@ -105,12 +105,21 @@ def create_app(settings=None):
                 await asyncio.sleep(60)
                 await asyncio.to_thread(db.archive_inactive, settings.archive_after_hours)
         task = asyncio.create_task(archive_loop())
+
+        async def permission_loop():
+            while True:
+                await asyncio.to_thread(db.settle_permissions)
+                await asyncio.sleep(0.5)
+        permission_task = asyncio.create_task(permission_loop())
         try:
             yield
         finally:
             task.cancel()
+            permission_task.cancel()
             with suppress(asyncio.CancelledError):
                 await task
+            with suppress(asyncio.CancelledError):
+                await permission_task
             db.close()
 
     app = FastAPI(title="AgentWatch", version=VERSION, lifespan=lifespan, docs_url=None, redoc_url=None)

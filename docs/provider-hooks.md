@@ -40,6 +40,14 @@ open `/hooks`, and trust the displayed AgentWatch commands once. A changed
 command may need review again. Organization policy or disabled hooks can stop
 either integration; AgentWatch does not override these settings.
 
+### Observed Codex startup timing
+
+A live check with Codex CLI 0.154.0 on 2026-09-10 confirmed that an idle, newly
+opened CLI window does not run SessionStart until its first prompt, even when
+`/hooks` reports the handler active and trusted. Quitting that empty window does
+run SessionEnd. The hook-only client therefore cannot announce the window at
+launch; immediate discovery requires a separate client-side integration.
+
 ## Wire contract
 
 Both command-hook APIs send a JSON object on stdin containing `session_id`,
@@ -84,11 +92,17 @@ human attention and their resolutions into the parent card.
 ## State inference and limits
 
 The **server** owns state transitions. Start is IDLE; prompt is WORKING;
-completion, input/permission waits, terminal failures, and interruption need
-ATTENTION; end is CLOSED. Tool failures are usually recoverable, so they record
+completion, input waits, terminal failures, and interruption need ATTENTION.
+Permission requests stay WORKING for a 30-second server-side grace period; only
+unresolved requests then become ATTENTION. End is CLOSED, hidden in the default
+Active view and available through the Closed filter. Tool failures are usually recoverable, so they record
 diagnostic metadata and keep the agent working. Acknowledgment sets IDLE.
 
-Permission/input waits stay visible across unrelated parallel tool activity.
+Pending permission deadlines survive server restarts and are canceled by matching
+tool completion, explicit resolution, a new turn, session end, or acknowledgment.
+The timer publishes a dashboard update even if no more hooks arrive. Repeated
+permission events do not extend the deadline. Permission/input waits stay visible
+across unrelated parallel tool activity.
 A matching tool completion or explicit input resolution clears the wait. The
 permission API often omits tool_use_id: matching by tool name is a heuristic,
 and permission approval itself has no distinct event. A long approved command
