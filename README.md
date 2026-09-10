@@ -112,6 +112,11 @@ resolve during that window never flash an attention alert. Input questions and
 turn completion appear immediately. The Needs attention summary turns yellow
 only when at least one session needs attention.
 
+On Linux, Codex Bash commands clear their permission alert when the client
+observes the exact command starting, so long-running flash/playback jobs stay
+Working. Update both the server and installed client to enable this behavior.
+See [the observer's matching limits](docs/provider-hooks.md#state-inference-and-limits).
+
 Filter by provider or state, search projects and machines, and acknowledge,
 archive, restore, or delete dashboard records. Live updates reconnect
 automatically. These controls do not approve commands or control the agents.

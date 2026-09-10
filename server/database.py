@@ -62,9 +62,16 @@ class Database:
         return result
 
     def public(self, session):
-        return {k: ({mk: mv for mk, mv in v.items() if not mk.startswith("_")}
-                    if k == "metadata" else v)
-                for k, v in session.items() if k not in ("last_event_at", "last_event_id")}
+        result = {k: ({mk: mv for mk, mv in v.items() if not mk.startswith("_")}
+                      if k == "metadata" else v)
+                  for k, v in session.items() if k not in ("last_event_at", "last_event_id")}
+        metadata = session["metadata"]
+        pending = metadata.get("_pending_permissions", {})
+        waits = metadata.get("_waits", {})
+        result["metadata"]["pending_permission_request_ids"] = [
+            request_id for key, request_id in metadata.get("_permission_ids", {}).items()
+            if key in pending or waits.get(key) == "permission_required"]
+        return result
 
     def get(self, session_id):
         with self.lock:
@@ -137,7 +144,8 @@ class Database:
             if (session["last_event_id"] == data.event_id or
                     (session["last_event_at"] and stamp < session["last_event_at"])):
                 return self.public(session)
-            transition(session, data.event, data.metadata, now=received_at, message=data.message)
+            if transition(session, data.event, data.metadata, now=received_at, message=data.message) is False:
+                return self.public(session)
             session["metadata"].update(data.metadata)
             session["metadata"]["last_event"] = data.event
             if data.cwd:
@@ -181,6 +189,7 @@ class Database:
                 session["attention_reason"] = "manual" if session["state"] == "ATTENTION" else None
                 session["metadata"].pop("_waits", None)
                 session["metadata"].pop("_pending_permissions", None)
+                session["metadata"].pop("_permission_ids", None)
             session["updated_at"] = iso(utcnow())
             self.save(session)
             return self.public(session)

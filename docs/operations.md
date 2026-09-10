@@ -168,8 +168,15 @@ Limitations to understand:
 
 Permission requests have a 30-second server-side grace period. Requests resolved
 within that window stay Working; unresolved requests become Needs attention,
-including without further hook events. Input questions and turn completion still
-appear immediately. The Needs attention summary is yellow only when its count is
+including without further hook events. On Linux, the client observes the exact
+Codex Bash command starting and resolves its permission immediately, without
+waiting for a long flash/playback command to finish. This requires the updated
+client as well as the server; reinstall the client after deploying the update.
+The observer uses local process arguments, never executes tool input, and exits
+when resolved, canceled, or the agent exits (at most 24 hours). If the shell
+replaces itself and exact matching is unavailable, completion remains the
+fallback. Other platforms and tools continue using hook-based resolution.
+Input questions and turn completion still appear immediately. The Needs attention summary is yellow only when its count is
 nonzero. Closed sessions are hidden in the default Active view; select Closed to
 see previous runs, including earlier sessions in the same directory.
 

@@ -17,12 +17,16 @@ def main(argv=None):
     install_parser.add_argument("--token-env", help="Read API token from this environment variable")
     commands.add_parser("uninstall", help="Remove only AgentWatch files/hooks; retain backups")
     commands.add_parser("status", help="Show configuration, integration, and server status")
+    commands.add_parser("watch-execution", help=argparse.SUPPRESS)
     commands.add_parser("test", help="Send a harmless attention event to the dashboard")
     hook = commands.add_parser("hook", help=argparse.SUPPRESS)
     hook.add_argument("--provider", required=True, choices=["codex", "claude"])
     hook.add_argument("--config")
     hook.add_argument("--agentwatch-managed", choices=["v1"])
     args = parser.parse_args(argv)
+    if args.command == "watch-execution":
+        from .execution import handle_watch
+        return handle_watch()
     if args.command == "hook":
         from .hooks import handle
         return handle(args.provider, args.config)

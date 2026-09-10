@@ -56,7 +56,9 @@ client collects it. Optional `model`, `agent_type`, `agent_id`, `turn_id`,
 `tool_name`, and `tool_use_id` become bounded metadata. `prompt` supplies the
 user message and `last_assistant_message` the completed response. Codex reports
 model on common inputs; Claude principally reports it at SessionStart.
-Tool inputs differ and are never executed by AgentWatch.
+Tool inputs differ and are never executed by AgentWatch. On Linux, Codex Bash
+permission hooks also pass the command to a detached local execution observer;
+the command is used only for comparison with process arguments.
 
 The client emits a UUID event ID, UTC capture time, compound session identity,
 normalized event, bounded message, and allowlisted metadata. It never reads
@@ -103,10 +105,24 @@ tool completion, explicit resolution, a new turn, session end, or acknowledgment
 The timer publishes a dashboard update even if no more hooks arrive. Repeated
 permission events do not extend the deadline. Permission/input waits stay visible
 across unrelated parallel tool activity.
-A matching tool completion or explicit input resolution clears the wait. The
-permission API often omits tool_use_id: matching by tool name is a heuristic,
-and permission approval itself has no distinct event. A long approved command
-can therefore retain its attention indication until it returns. Prompt start
+A matching tool completion or explicit input resolution clears the wait. When
+available, tool_use_id/elicitation_id distinguishes parallel calls of the same
+tool. Older events without IDs still use tool-name matching as a fallback.
+
+On Linux, a Codex Bash permission hook starts a detached observer. It compares
+the requested command with new processes beneath the originating Codex process,
+checking the parent's start time against PID reuse and excluding pre-existing
+matches. An exact shell body or literal argument list confirms execution. The
+observer immediately reports input_resolved with the permission request's UUID,
+so an approved command remains Working even when it runs for hours. The server
+ignores resolutions for canceled/replaced requests. Other pending approvals and
+input questions remain visible. Polling stops after observation, cancellation,
+agent exit, network failure, or 24 hours. No command is rewritten or approved.
+
+There is no dedicated approval-result hook. Platforms other than Linux, non-Bash
+tools, and commands whose shell has replaced itself with an unidentifiable
+process retain completion-based resolution. Shell expansion and partial command
+matches are deliberately not treated as proof of execution. Prompt start
 clears previous waits. Timestamp ordering rejects older events; synchronized
 machine clocks are recommended. Activity after an observed completion cannot
 silently reopen it, except a new tool start or prompt indicating resumed work.
@@ -118,7 +134,8 @@ are reported as turn completion. Codex MCP elicitation occurring inside a tool
 has no documented dedicated hook, so it cannot always be observed. Codex also
 has no general terminal API-error signal. Crashes, SIGKILL, provider-disabled
 hooks, untrusted hooks, network loss, and some Claude interrupts can leave
-stale state. No wrapper, transcript tailer, or process monitor is installed.
+stale state. No wrapper or transcript tailer is installed. The Linux execution
+observer is launched only for Codex Bash permission requests.
 Last-activity age stays visible; inactivity archives the card, never invents a
 successful completion.
 

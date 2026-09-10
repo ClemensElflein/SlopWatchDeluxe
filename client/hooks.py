@@ -22,9 +22,14 @@ def handle(provider, config_file=None):
         raw = sys.stdin.buffer.read(1048577)
         if len(raw) > 1048576:
             return 0
-        event = ADAPTERS[provider].normalize(json.loads(raw))
+        payload = json.loads(raw)
+        event = ADAPTERS[provider].normalize(payload)
         if event:
-            request(load_config(config_file), "/api/v1/events", event)
+            if event["event"] == "permission_required":
+                event["metadata"]["permission_request_id"] = event["event_id"]
+            session = request(load_config(config_file), "/api/v1/events", event)
+            from .execution import start_watcher
+            start_watcher(payload, event, session["id"], config_file)
     except (Exception, KeyboardInterrupt):
         pass
     finally:

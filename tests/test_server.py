@@ -247,3 +247,42 @@ def test_pending_permissions_survive_server_restart(tmp_path, server_clock):
         server_clock[0] += timedelta(seconds=PERMISSION_GRACE_SECONDS)
         assert app.state.db.settle_permissions() == 1
         assert api.get("/api/v1/sessions/" + pending["id"]).json()["attention_reason"] == "permission_required"
+
+
+@pytest.mark.parametrize('elapsed', [2, 31, 7200])
+def test_execution_resolves_permission_before_long_command_finishes(api, app, server_clock, elapsed):
+    metadata = {'tool_name': 'Bash', 'tool_use_id': 'flash', 'permission_request_id': 'approval-flash'}
+    event(api, 'permission_required', metadata=metadata)
+    server_clock[0] += timedelta(seconds=elapsed)
+    app.state.db.settle_permissions()
+    resolved = event(api, 'input_resolved', metadata={**metadata, 'execution_observed': True})
+    assert resolved['state'] == 'WORKING' and resolved['attention_reason'] is None
+    server_clock[0] += timedelta(hours=3)
+    assert app.state.db.settle_permissions() == 0
+
+
+def test_parallel_commands_have_independent_permissions(api, app, server_clock):
+    first = {'tool_name': 'Bash', 'tool_use_id': 'flash', 'permission_request_id': 'flash-approval'}
+    second = {'tool_name': 'Bash', 'tool_use_id': 'other', 'permission_request_id': 'other-approval'}
+    event(api, 'permission_required', metadata=first)
+    event(api, 'permission_required', metadata=second)
+    server_clock[0] += timedelta(seconds=31)
+    app.state.db.settle_permissions()
+    assert event(api, 'input_resolved', metadata=first)['state'] == 'ATTENTION'
+    assert event(api, 'tool_finished', metadata=first)['state'] == 'ATTENTION'
+    assert event(api, 'input_resolved', metadata=second)['state'] == 'WORKING'
+
+
+@pytest.mark.parametrize('next_event', ['work_started', 'turn_finished', 'session_ended', 'input_required'])
+def test_late_execution_observation_cannot_overwrite_lifecycle(api, next_event):
+    metadata = {'tool_name': 'Bash', 'tool_use_id': 'flash', 'permission_request_id': 'approval-flash'}
+    event(api, 'permission_required', metadata=metadata)
+    current = event(api, next_event, metadata={'tool_name': 'Bash', 'tool_use_id': 'flash'})
+    assert event(api, 'input_resolved', metadata=metadata) == current
+
+
+def test_late_execution_observation_cannot_undo_acknowledgment(api):
+    metadata = {'tool_name': 'Bash', 'permission_request_id': 'approval-flash'}
+    pending = event(api, 'permission_required', metadata=metadata)
+    current = api.patch('/api/v1/sessions/' + pending['id'], json={'state': 'IDLE'}).json()
+    assert event(api, 'input_resolved', metadata=metadata) == current
