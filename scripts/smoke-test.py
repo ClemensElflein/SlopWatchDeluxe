@@ -59,8 +59,15 @@ def main():
                                            ("UserPromptSubmit", "WORKING", {}),
                                            ("SessionEnd", "CLOSED", {})):
                     payload = {"session_id": identity, "cwd": str(home / provider), "hook_event_name": hook, **extra}
-                    result = subprocess.run(cmd, shell=True, env=env, cwd=home, input=json.dumps(payload),
-                                            capture_output=True, text=True, timeout=3)
+                    if provider == "codex" and hook == "Stop":
+                        payload = {"type": "agent-turn-complete", "thread-id": identity,
+                                   "cwd": str(home / provider), "last-assistant-message": extra["last_assistant_message"]}
+                        argv = installed["integrations"][provider]["notify"]["command"]
+                        result = subprocess.run([*argv, json.dumps(payload)], env=env, cwd=home,
+                                                capture_output=True, text=True, timeout=3)
+                    else:
+                        result = subprocess.run(cmd, shell=True, env=env, cwd=home, input=json.dumps(payload),
+                                                capture_output=True, text=True, timeout=3)
                     assert result.returncode == 0 and result.stdout == result.stderr == ""
                     rows = request(config, "/api/v1/sessions")
                     session = next(s for s in rows if s["provider_session_id"] == identity)

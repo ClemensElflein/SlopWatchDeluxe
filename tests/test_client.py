@@ -16,7 +16,7 @@ from client.installer import install_files
 def test_adapter_common_lifecycle(provider):
     adapter = ADAPTERS[provider]
     for hook, expected in (("SessionStart", "session_started"), ("UserPromptSubmit", "work_started"),
-                           ("Stop", "turn_finished"), ("PermissionRequest", "permission_required"),
+                           ("PermissionRequest", "permission_required"),
                            ("PreToolUse", "tool_started"), ("PostToolUse", "tool_finished"), ("SessionEnd", "session_ended")):
         payload = {"session_id": "abc", "cwd": "/work", "hook_event_name": hook,
                    "prompt": "Help", "last_assistant_message": "Done", "model": "model-id"}

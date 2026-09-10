@@ -7,7 +7,7 @@ from .config import load_config
 from .transport import request
 
 
-def handle(provider, config_file=None):
+def handle(provider, config_file=None, notification=None):
     """Fail open, including bad input, missing config, DNS stalls, and server errors."""
     alarm = hasattr(signal, "setitimer")
     previous = None
@@ -19,11 +19,12 @@ def handle(provider, config_file=None):
         if alarm:
             previous = signal.signal(signal.SIGALRM, expired)
             signal.setitimer(signal.ITIMER_REAL, 1.2)
-        raw = sys.stdin.buffer.read(1048577)
+        raw = notification if notification is not None else sys.stdin.buffer.read(1048577)
         if len(raw) > 1048576:
             return 0
         payload = json.loads(raw)
-        event = ADAPTERS[provider].normalize(payload)
+        event = (ADAPTERS[provider].normalize_notification(payload) if notification is not None
+                 else ADAPTERS[provider].normalize(payload))
         if event:
             if event["event"] == "permission_required":
                 event["metadata"]["permission_request_id"] = event["event_id"]

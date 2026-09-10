@@ -12,7 +12,7 @@ def text(value, limit=8000):
 COMMON = {
     "SessionStart": "session_started", "UserPromptSubmit": "work_started",
     "PreToolUse": "tool_started", "PostToolUse": "tool_finished",
-    "PermissionRequest": "permission_required", "Stop": "turn_finished",
+    "PermissionRequest": "permission_required",
     "SessionEnd": "session_ended",
 }
 
@@ -108,9 +108,22 @@ class CodexAdapter(BaseAdapter):
     input_tools = {"request_user_input", "request_user_input_async"}
 
 
+    def normalize_notification(self, payload, hostname=None):
+        if not isinstance(payload, dict) or payload.get("type") != "agent-turn-complete":
+            return None
+        event = self.normalize({"session_id": payload.get("thread-id"),
+                                "hook_event_name": "SessionStart", "cwd": payload.get("cwd"),
+                                "turn_id": payload.get("turn-id")}, hostname, collect_git=False)
+        if event:
+            event["event"] = "turn_finished"
+            event["message"] = text(payload.get("last-assistant-message"))
+            event["metadata"]["provider_hook"] = "agent-turn-complete"
+        return event
+
+
 class ClaudeAdapter(BaseAdapter):
     provider = "claude"
-    events = {**COMMON, "StopFailure": "failed", "PostToolUseFailure": "tool_failed",
+    events = {**COMMON, "Stop": "turn_finished", "StopFailure": "failed", "PostToolUseFailure": "tool_failed",
               "Notification": None, "Elicitation": "input_required", "ElicitationResult": "input_resolved"}
     input_tools = {"AskUserQuestion", "ExitPlanMode"}
 

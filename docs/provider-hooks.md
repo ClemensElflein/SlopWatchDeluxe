@@ -17,7 +17,7 @@ Primary references:
 
 | | Codex | Claude Code |
 | --- | --- | --- |
-| Global file used by SlopWatchDeluxe | `$CODEX_HOME/hooks.json`, default `~/.codex/hooks.json` | `$CLAUDE_CONFIG_DIR/settings.json`, default `~/.claude/settings.json` |
+| Global files used by SlopWatchDeluxe | `$CODEX_HOME/hooks.json` and `$CODEX_HOME/config.toml`, default `~/.codex/` | `$CLAUDE_CONFIG_DIR/settings.json`, default `~/.claude/settings.json` |
 | Other representations | Inline TOML hooks and plugin hooks | Project/local/managed settings, plugins, skills |
 | Shape | `hooks[event]` is an array of matcher groups, each with a `hooks` handler array | Same nesting |
 | Handler used | `type: command`, shell-quoted absolute command, `timeout: 2` | Same |
@@ -25,14 +25,26 @@ Primary references:
 | Coexistence | All matching sources accumulate; inline TOML plus JSON produces a warning | Hook arrays merge across settings layers |
 | Activation | Review/trust new or changed definitions through `/hooks`; hooks are enabled by default | Start a fresh CLI session after installation; inspect `/hooks` |
 
-SlopWatchDeluxe only edits JSON. It leaves Codex `config.toml` byte-for-byte intact,
-including existing `notify` and inline hooks. It validates the whole JSON
-structure, adds its own handler groups, preserves all unrelated values, backs
-up original bytes, and atomically replaces the file. It uses an exact owned
+SlopWatchDeluxe edits JSON lifecycle hooks and the top-level Codex `notify`
+assignment in `config.toml`. It validates the whole JSON/TOML document before
+writing. JSON edits add owned handler groups, preserve unrelated values, back
+up original bytes, and atomically replace the file. It uses an exact owned
 command marker and executable/config paths to identify its handlers. Removing
 the integration removes those handlers, not an entire event or another user's
 matcher group. Changed files get timestamped backups, including on uninstall.
 Duplicate JSON keys are rejected instead of silently losing values.
+
+Codex completion uses `notify` with `agent-turn-complete`, not `Stop`. The
+installer removes the old owned Codex `Stop` handlers on upgrade and installs
+an argv-based callback in user-level `config.toml`. It preserves all other TOML
+bytes, including inline lifecycle hooks. An existing notifier is recorded and
+launched separately with the same JSON argument, using literal argv without a
+shell. Uninstall restores the original notify assignment if ours is still
+present; subsequent user changes are preserved. Directory moves and provider
+removal also restore the prior setting. `status` checks both lifecycle hooks
+and the notify command. Configuration profiles that override `notify` can
+supersede this user-level integration.
+
 
 **Codex requires human trust review.** The installer does not synthesize trust
 hashes or turn off trust checks. Configured does not mean activated: run Codex,
@@ -50,7 +62,7 @@ launch; immediate discovery requires a separate client-side integration.
 
 ## Wire contract
 
-Both command-hook APIs send a JSON object on stdin containing `session_id`,
+Both lifecycle command-hook APIs send a JSON object on stdin containing `session_id`,
 `cwd`, and `hook_event_name`. Neither supplies the machine hostname, so the
 client collects it. Optional `model`, `agent_type`, `agent_id`, `turn_id`,
 `tool_name`, and `tool_use_id` become bounded metadata. `prompt` supplies the
@@ -59,6 +71,13 @@ model on common inputs; Claude principally reports it at SessionStart.
 Tool inputs differ and are never executed by SlopWatchDeluxe. On Linux, Codex Bash
 permission hooks also pass the command to a detached local execution observer;
 the command is used only for comparison with process arguments.
+
+Codex `notify` instead appends one JSON argument to the configured command.
+Only `type: agent-turn-complete` maps to completion: `thread-id` identifies the
+session, `turn-id` identifies the turn, `cwd` supplies its directory, and
+`last-assistant-message` supplies the response. The callback does not read stdin
+or forward `input-messages` to the dashboard. Terminal focus and BEL/OSC settings
+do not control this callback.
 
 The client emits a UUID event ID, UTC capture time, compound session identity,
 normalized event, bounded message, and allowlisted metadata. It never reads
@@ -77,7 +96,7 @@ start (including worktree indirection); no git subprocess runs in hooks.
 | Permission waiting | PermissionRequest | PermissionRequest; Notification permission_prompt | permission_required |
 | User question | PreToolUse request_user_input / request_user_input_async (tool-name heuristic) | PreToolUse AskUserQuestion / ExitPlanMode; Elicitation; selected Notification types | input_required |
 | Input returned | Corresponding PostToolUse | ElicitationResult / corresponding PostToolUse | input_resolved / tool_finished |
-| Turn complete | Stop | Stop | turn_finished |
+| Turn complete | notify: agent-turn-complete | Stop | turn_finished |
 | Terminal failure | No documented general failure hook | StopFailure (`error`, `error_details`) | failed |
 | Recoverable tool failure | PostToolUse is still tool activity | PostToolUseFailure (`error`, `is_interrupt`) | tool_failed, or interrupted |
 | User interrupted | Interrupt | No general interrupt hook; interrupted tool failure is partial coverage | interrupted |
@@ -127,8 +146,9 @@ clears previous waits. Timestamp ordering rejects older events; synchronized
 machine clocks are recommended. Activity after an observed completion cannot
 silently reopen it, except a new tool start or prompt indicating resumed work.
 
-Stop can run before another hook decides to continue the agent. A later prompt
-or tool start corrects the temporary completion indication. Background tasks
+Claude Stop can run before another hook decides to continue the agent. A later
+prompt or tool start corrects that temporary indication. Codex Stop is ignored;
+completion comes only from its agent-turn-complete notification. Background tasks
 do not necessarily mean the main turn remains active. Plain prose questions
 are reported as turn completion. Codex MCP elicitation occurring inside a tool
 has no documented dedicated hook, so it cannot always be observed. Codex also

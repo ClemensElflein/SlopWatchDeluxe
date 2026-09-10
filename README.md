@@ -90,11 +90,18 @@ python3 slopwatchdeluxe.pyz install
 The installer asks for the server URL, an optional token, and which detected
 providers to connect. Keep launching `codex` and `claude` as usual.
 
-- **Codex:** Open `/hooks` and review/trust the SlopWatchDeluxe commands once. New or
+- **Codex:** Completion uses the `agent-turn-complete` notification callback;
+  lifecycle hooks track work and input requests. Existing notifiers are preserved.
+  Open `/hooks` and review/trust the SlopWatchDeluxe commands once. New or
   changed hooks are skipped until trusted. In Codex CLI 0.154.0, registration
   happens at the **first prompt**, not when an empty window opens.
 - **Claude Code:** Start a fresh session after installation. Existing hooks are
   preserved; inspect `/hooks` if the session does not appear.
+
+When upgrading to **1.1.1**, update the server, download its new
+`slopwatchdeluxe.pyz`, and run the installer again. This migrates Codex completion
+from `Stop` to `notify`; updating the server alone does not update installed
+clients. Start fresh Codex sessions afterward.
 
 The client needs **Python 3.11+** on Linux, macOS, or WSL. Supported baselines are
 **Codex CLI 0.154.0+** and **Claude Code 2.1.259+**. No pip dependencies, sudo,

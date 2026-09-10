@@ -23,7 +23,14 @@ def main(argv=None):
     hook.add_argument("--provider", required=True, choices=["codex", "claude"])
     hook.add_argument("--config")
     hook.add_argument("--slopwatchdeluxe-managed", choices=["v1"])
+    notify = commands.add_parser("notify", help=argparse.SUPPRESS)
+    notify.add_argument("--config")
+    notify.add_argument("--slopwatchdeluxe-managed", choices=["v1"])
+    notify.add_argument("payload")
     args = parser.parse_args(argv)
+    if args.command == "notify":
+        from .codex_notify import handle_notification
+        return handle_notification(args.payload, args.config)
     if args.command == "watch-execution":
         from .execution import handle_watch
         return handle_watch()
@@ -49,6 +56,10 @@ def main(argv=None):
         event = ADAPTERS[provider].normalize({"session_id": "slopwatchdeluxe-test-" + str(uuid4()),
                                             "cwd": str(Path.cwd()), "hook_event_name": "Stop",
                                             "last_assistant_message": "SlopWatchDeluxe connection test succeeded. You can delete this card."})
+        if provider == "codex":
+            event = ADAPTERS[provider].normalize_notification({"type": "agent-turn-complete",
+                "thread-id": "slopwatchdeluxe-test-" + str(uuid4()), "cwd": str(Path.cwd()),
+                "last-assistant-message": "SlopWatchDeluxe connection test succeeded. You can delete this card."})
         event["metadata"]["test"] = True
         result = request(config, "/api/v1/events", event, timeout=2)
         if result.get("provider_session_id") != event["provider_session_id"] or result.get("state") != "ATTENTION":

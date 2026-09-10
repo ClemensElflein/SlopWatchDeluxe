@@ -19,6 +19,7 @@ import zipfile
 from . import VERSION
 from .adapters import ADAPTERS
 from .build import build_bytes
+from .codex_notify import notify_value, prepare_changes
 from .config import config_path, endpoint, load_config, read_json
 from .transport import request
 
@@ -227,6 +228,7 @@ def install_files(url, token, providers, config_file=None, binary=None):
             if updated != data:
                 mode = stat.S_IMODE(path.stat().st_mode) if path.exists() else 0o600
                 changes.append((path, original, encoded(updated), mode))
+        changes.extend(prepare_changes(records, new_records, config_file, binary, snapshot))
         updated_config = {**config, "version": VERSION, "url": url, "token": token,
                           "binary": str(binary), "integrations": new_records}
         changes = [(binary, old_binary, artifact_bytes(), 0o755),
@@ -254,6 +256,7 @@ def uninstall_files(config_file=None):
             if updated != data:
                 changes.append((path, original, encoded(updated), stat.S_IMODE(path.stat().st_mode)))
         binary = Path(config["binary"])
+        changes.extend(prepare_changes(config.get("integrations", {}), {}, config_file, binary, snapshot))
         if binary.exists() and is_slopwatchdeluxe(binary):
             changes.append((binary, snapshot(binary), None, 0o755))
         changes.append((config_file, snapshot(config_file), None, 0o600))
@@ -268,6 +271,10 @@ def hooks_installed(provider, config):
     path = Path(record["path"])
     data = read_json(path, missing=True)
     validate_hooks(data, path)
+    if provider == "codex":
+        notify = record.get("notify")
+        if not notify or notify_value(snapshot(Path(notify["path"])) or b"") != notify["command"]:
+            return False
     return all(any(h.get("command") == record["command"] and h.get("type") == "command" and h.get("timeout") == 2
                    for group in data.get("hooks", {}).get(event, []) for h in group["hooks"])
                for event in ADAPTERS[provider].events)

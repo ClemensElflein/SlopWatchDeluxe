@@ -29,11 +29,11 @@ def test_fresh_install_and_zipapp_runs(fake_home):
     assert config_path().stat().st_mode & 0o777 == 0o600
     assert is_slopwatchdeluxe(Path(config["binary"]))
     result = subprocess.run([sys.executable, config["binary"], "--version"], capture_output=True, text=True)
-    assert result.returncode == 0 and "SlopWatchDeluxe 1.1.0" in result.stdout
+    assert result.returncode == 0 and "SlopWatchDeluxe 1.1.1" in result.stdout
     for provider in ("codex", "claude"):
         assert hooks_installed(provider, config)
         assert "test-token" not in provider_path(provider).read_text()
-    assert not (fake_home / ".codex/config.toml").exists()
+    assert (fake_home / ".codex/config.toml").exists()
 
 
 def test_existing_hooks_and_idempotence(fake_home):
@@ -88,7 +88,7 @@ def test_malformed_config_fails_before_writes(fake_home, malformed):
     assert not (fake_home / ".local/bin/slopwatchdeluxe").exists()
 
 
-def test_backup_original_bytes_and_toml_untouched(fake_home):
+def test_backup_original_bytes_and_existing_notifier_preserved(fake_home):
     path = provider_path("codex")
     path.parent.mkdir(parents=True)
     original = b'{ "description": "mine", "hooks": {} }\n'
@@ -96,10 +96,13 @@ def test_backup_original_bytes_and_toml_untouched(fake_home):
     toml = path.parent / "config.toml"
     toml.write_text('# existing config\nnotify = ["my-notifier"]\n[features]\nhooks = true\n')
     before = toml.read_bytes()
-    setup()
+    config = setup()
     backup = next(path.parent.glob("hooks.json.slopwatchdeluxe-backup-*"))
     assert backup.read_bytes() == original
     assert backup.stat().st_mode & 0o777 == 0o600
+    assert config["integrations"]["codex"]["notify"]["previous_command"] == ["my-notifier"]
+    assert toml.read_bytes().endswith(b"[features]\nhooks = true\n")
+    uninstall_files()
     assert toml.read_bytes() == before
 
 
