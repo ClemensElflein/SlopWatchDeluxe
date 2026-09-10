@@ -21,7 +21,7 @@ development machine. The “Deluxe” is mostly confidence.
 > that everything is fine. This is a personal experiment; the vibes are not
 > a warranty.
 
-![SlopWatchDeluxe showing completed work, a question, a working agent, and an idle agent](docs/screenshots/slopwatchdeluxe-active-sessions.png)
+![SlopWatchDeluxe showing completed work, a question, a working agent, and an idle agent](docs/screenshots/slopwatchdeluxe-active-sessions.png?v=1.1.0)
 
 *The real dashboard with sample sessions. Artisanal slop, served locally.*
 
@@ -112,6 +112,12 @@ on your PATH, use `~/.local/bin/slopwatchdeluxe` for the commands above.
 
 ## What the dashboard shows
 
+Want the slop to announce itself? Click **Sound off** in the header to enable a
+short chime when a session newly needs attention; click **Sound on** to mute it.
+Your preference is remembered in this browser. After reloading, click
+**Resume sound** (or interact with the page) to allow audio again. Existing
+attention cards stay quiet on page load, and filters do not affect alerts.
+
 | State | Meaning |
 | --- | --- |
 | Needs attention | A turn finished, input is needed, or a failure/interruption was reported |
@@ -136,7 +142,7 @@ automatically. These controls do not approve commands or control the agents.
 Closed sessions stay out of your way, including previous runs in the same
 directory. Select **Closed** to view them:
 
-![The Closed filter shows an earlier session while the attention count is zero and the summary is neutral](docs/screenshots/slopwatchdeluxe-closed-sessions.png)
+![The Closed filter shows an earlier session while the attention count is zero and the summary is neutral](docs/screenshots/slopwatchdeluxe-closed-sessions.png?v=1.1.0)
 
 ## Builds and development
 
@@ -162,6 +168,7 @@ To run the tests:
 python3 -m venv .venv
 .venv/bin/pip install -e '.[test]'
 .venv/bin/pytest -q
+node --test tests/test_attention_sound.cjs
 ```
 
 Docker builds the downloadable client automatically. To build it separately,

@@ -290,3 +290,16 @@ server URL and token. Rename server environment variables from `AGENTWATCH_`
 to `SLOPWATCHDELUXE_`. To preserve existing sessions, attach the existing Docker
 data volume and set `SLOPWATCHDELUXE_DATABASE` to its existing `/data/agentwatch.db`
 file. The new default volume and database names otherwise start a fresh database.
+
+## Attention sounds
+
+The header sound toggle starts muted and remembers your preference in this
+browser. Enabling it plays a short preview. A chime then plays when a new session
+needs attention or an existing session enters Needs attention again. Several
+arrivals in one refresh share a chime. Changing filters, refreshing unchanged
+cards, and loading existing attention cards do not replay alerts. Muting also
+stops a chime already playing.
+
+Keep the dashboard tab open for sounds. After a reload, use **Resume sound** or
+interact with the page to allow audio. Browser or system muting and suspended
+background tabs can prevent or delay playback. No audio file is downloaded.

@@ -55,3 +55,15 @@ remain subject to the hook trust/policy and coverage limits in
   despite active/trusted hooks. SessionEnd ran on quit. No model prompts were
   submitted by these diagnostics. Immediate launch discovery remains separate
   from the hook-only integration.
+
+## Release 1.1.0 verification (2026-09-10)
+
+- 80 Python tests and 8 JavaScript sound tests passed. Sound checks cover initial
+  load, new attention transitions, unchanged counts, repeated refreshes,
+  archived sessions, muting, saved preferences, and unavailable audio/storage.
+- Real Chrome gestures enabled the audio context. Live SSE updates triggered
+  the two-note chime; repeated refreshes and filter changes stayed quiet.
+  Muting and reload persistence worked, with no script exceptions.
+- Header layout stayed within the viewport at widths of 390, 768, 1024, and
+  1440 pixels. README screenshots were captured from the updated dashboard.
+- The Docker image built successfully with version 1.1.0 and the GPL license.

@@ -1,5 +1,6 @@
 'use strict';
 const $ = id => document.getElementById(id);
+const attentionSound = new AttentionSound($('sound-toggle'));
 let token = sessionStorage.getItem('slopwatchdeluxe-token') || '';
 let active = [], archived = [], filter = 'all', provider = 'all', search = '';
 let controller, generation = 0, refreshRunning = false, refreshAgain = false;
@@ -45,6 +46,7 @@ async function refresh() {
     do {
       refreshAgain = false;
       [active, archived] = await Promise.all([allSessions(false), allSessions(true)]);
+      attentionSound.update(active);
       error(); render();
       $('updated').textContent = 'Updated ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
     } while (refreshAgain);

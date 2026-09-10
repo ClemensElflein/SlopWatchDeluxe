@@ -688,8 +688,11 @@ dialog p {
 
 @media(max-width:640px) {
   .topbar {
-    height:70px;
-    padding:0 5%;
+    min-height:70px;
+    height:auto;
+    flex-wrap:wrap;
+    gap:14px;
+    padding:16px 5%;
   }
   .brand {
     font-size:18px;
@@ -698,13 +701,14 @@ dialog p {
     display:none;
   }
   .top-actions {
+    margin-left:auto;
     gap:10px;
   }
-  .top-actions button {
+  #settings-button {
     font-size:0;
     padding:7px;
   }
-  .top-actions button:after {
+  #settings-button:after {
     content:'Settings';
     font-size:10px;
   }
@@ -806,4 +810,14 @@ dialog p {
   .empty {
     padding:40px 15px;
   }
+}
+
+#sound-toggle {
+  white-space:nowrap;
+}
+
+#sound-toggle[aria-pressed="true"] {
+  color:#285642;
+  background:#edf6ee;
+  border-color:#b8d5bf;
 }

@@ -29,7 +29,7 @@ def test_fresh_install_and_zipapp_runs(fake_home):
     assert config_path().stat().st_mode & 0o777 == 0o600
     assert is_slopwatchdeluxe(Path(config["binary"]))
     result = subprocess.run([sys.executable, config["binary"], "--version"], capture_output=True, text=True)
-    assert result.returncode == 0 and "SlopWatchDeluxe 1.0.0" in result.stdout
+    assert result.returncode == 0 and "SlopWatchDeluxe 1.1.0" in result.stdout
     for provider in ("codex", "claude"):
         assert hooks_installed(provider, config)
         assert "test-token" not in provider_path(provider).read_text()
