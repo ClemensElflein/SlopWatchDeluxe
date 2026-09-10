@@ -1,8 +1,13 @@
 # AgentWatch
 
-**This project is fully vibe coded.** The implementation, tests, and documentation
-were written with an AI coding agent, guided by human prompts and iteration.
-It is a personal experiment with rough edges, not a claim of production readiness.
+> [!WARNING]
+> **100% VIBE CODED. NO MANUAL CODE WILL TOUCH THIS REPO.**
+>
+> Humans supply prompts, opinions, and bug reports. AI writes the code, tests,
+> and documentation. Even the fixes come from another prompt.
+>
+> Yes, the AI wrote the tests too. This is a personal experiment;
+> the vibes are not a warranty.
 
 AgentWatch is a small, self-hosted dashboard for **Codex CLI** and **Claude Code**.
 See which agents are working, which need your attention, and which are ready for
