@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentwatch"
+version = "0.1.0"
+description = "A self-hosted attention dashboard for coding agents"
+requires-python = ">=3.11"
+dependencies = ["fastapi==0.135.1", "uvicorn==0.41.0"]
+
+[project.optional-dependencies]
+test = ["pytest==9.0.2", "httpx==0.28.1"]
+
+[tool.setuptools]
+packages = ["server", "client"]
+
+[tool.setuptools.package-data]
+server = ["static/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

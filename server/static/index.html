@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>AgentWatch</title>
+  <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">a<span>•</span></span>AgentWatch<span class="version">LOCAL / 01</span></a>
+    <div class="top-actions"><span id="connection" class="connection offline" role="status">Connecting</span><button id="settings-button" class="quiet">Connection settings</button></div>
+  </header>
+  <main>
+    <section class="intro">
+      <div><p class="eyebrow">YOUR AGENTS, AT A GLANCE</p><h1>A little less terminal checking.</h1><p class="subtitle">See who’s working. Know who needs you.</p></div>
+      <a class="download" href="/agentwatch.pyz" download>↓ Get the hook client</a>
+    </section>
+    <section id="settings" class="settings" hidden>
+      <div><strong>Dashboard API token</strong><p>Use the token configured on your server. It stays in this browser tab.</p></div>
+      <form id="token-form"><label class="sr-only" for="token">API token</label><input type="password" id="token" autocomplete="off" placeholder="Optional API token"><button type="submit" class="primary">Connect</button><button type="button" id="clear-token" class="quiet">Clear</button></form>
+    </section>
+    <div id="error" class="error" role="alert" hidden></div>
+    <section class="stats" aria-label="Session counts">
+      <button class="stat attention-stat" data-state="ATTENTION"><span><i></i>Needs attention</span><strong id="attention-count">0</strong><small>Your next stop</small></button>
+      <button class="stat" data-state="WORKING"><span><i class="working-dot"></i>Working</span><strong id="working-count">0</strong><small>Making progress</small></button>
+      <button class="stat" data-state="IDLE"><span><i class="idle-dot"></i>Idle</span><strong id="idle-count">0</strong><small>Ready for a prompt</small></button>
+      <div class="stat total-stat"><span>Active sessions</span><strong id="total-count">0</strong><small>Across your machines</small></div>
+    </section>
+    <div class="toolbar">
+      <nav class="filters" aria-label="Filter by session state">
+        <button data-state="all" class="selected" aria-pressed="true">All sessions</button><button data-state="ATTENTION" aria-pressed="false">Attention</button><button data-state="WORKING" aria-pressed="false">Working</button><button data-state="IDLE" aria-pressed="false">Idle</button><button data-state="archived" aria-pressed="false">Archived</button>
+      </nav>
+      <div class="search-filters"><label class="sr-only" for="provider">Provider</label><select id="provider"><option value="all">All providers</option><option value="codex">Codex</option><option value="claude">Claude</option></select><label class="sr-only" for="search">Search projects and machines</label><input id="search" type="search" placeholder="Search projects or machines…"></div>
+    </div>
+    <div id="sessions" aria-live="polite" aria-busy="true"></div>
+    <footer><span><span class="footer-dot"></span> Self-hosted. All in one place.</span><span id="updated">Waiting for the server…</span></footer>
+  </main>
+  <dialog id="delete-dialog"><form method="dialog"><p class="eyebrow">DELETE SESSION</p><h2 id="delete-title">Delete this session?</h2><p>This removes the dashboard record permanently. A new hook event can create it again.</p><div class="dialog-actions"><button value="cancel" class="quiet">Cancel</button><button value="delete" class="danger">Delete session</button></div></form></dialog>
+</body>
+</html>
