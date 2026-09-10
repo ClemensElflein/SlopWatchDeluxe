@@ -4,8 +4,8 @@
 
 SlopWatchDeluxe is a small, self-hosted dashboard for **Codex CLI** and **Claude Code**.
 See which agents are working, which need your attention, and which are ready for
-another prompt. Because once you've outsourced the coding, apparently the next
-step is outsourcing the part where you check whether the coding is done.
+another prompt—all in one browser tab. You’re still supervising the slop.
+Now it has a dashboard.
 
 One Python server, one SQLite database, and a portable hook client on each
 development machine. The “Deluxe” is mostly confidence.
@@ -21,7 +21,7 @@ development machine. The “Deluxe” is mostly confidence.
 > that everything is fine. This is a personal experiment; the vibes are not
 > a warranty.
 
-![SlopWatchDeluxe showing completed work, a question, a working agent, and an idle agent](docs/screenshots/active-sessions.png)
+![SlopWatchDeluxe showing completed work, a question, a working agent, and an idle agent](docs/screenshots/slopwatchdeluxe-active-sessions.png)
 
 *The real dashboard with sample sessions. Artisanal slop, served locally.*
 
@@ -136,7 +136,7 @@ automatically. These controls do not approve commands or control the agents.
 Closed sessions stay out of your way, including previous runs in the same
 directory. Select **Closed** to view them:
 
-![The Closed filter shows an earlier session while the attention count is zero and the summary is neutral](docs/screenshots/closed-sessions.png)
+![The Closed filter shows an earlier session while the attention count is zero and the summary is neutral](docs/screenshots/slopwatchdeluxe-closed-sessions.png)
 
 ## Builds and development
 
