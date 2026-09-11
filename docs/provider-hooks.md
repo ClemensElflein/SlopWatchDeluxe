@@ -79,6 +79,15 @@ session, `turn-id` identifies the turn, `cwd` supplies its directory, and
 or forward `input-messages` to the dashboard. Terminal focus and BEL/OSC settings
 do not control this callback.
 
+A dashboard inspection on 2026-09-11 found separate background title and recap
+threads sending this callback without lifecycle hooks. The server therefore
+accepts these completions only for a session already registered by a lifecycle
+event or explicit API creation. Unknown notifications return 204 without a new
+card or stream update. Matching uses provider, hostname, and thread ID, never
+working directory or response content. Older clients work with this server-side
+rule. If all registration events were dropped or hooks were disabled, the next
+lifecycle event must register the session before completion can be shown.
+
 The client emits a UUID event ID, UTC capture time, compound session identity,
 normalized event, bounded message, and allowlisted metadata. It never reads
 `transcript_path`, arbitrary agent-supplied files, or elicitation answers.

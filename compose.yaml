@@ -4,7 +4,10 @@ services:
   slopwatchdeluxe:
     container_name: slopwatchdeluxe
     image: ghcr.io/clemenselflein/slopwatchdeluxe:latest
-    build: .
+    build:
+      context: .
+      args:
+        SLOPWATCHDELUXE_BUILD: ${SLOPWATCHDELUXE_BUILD:-}
     restart: unless-stopped
     ports:
       - "${SLOPWATCHDELUXE_PORT:-8765}:8765"

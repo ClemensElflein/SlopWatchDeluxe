@@ -696,9 +696,16 @@ dialog p {
   }
   .brand {
     font-size:18px;
+    display:grid;
+    grid-template-columns:36px minmax(0,1fr);
+    row-gap:4px;
   }
   .version {
-    display:none;
+    grid-column:2;
+    margin-left:0;
+    padding-left:0;
+    border-left:0;
+    overflow-wrap:anywhere;
   }
   .top-actions {
     margin-left:auto;

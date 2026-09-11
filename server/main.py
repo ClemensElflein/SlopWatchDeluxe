@@ -11,10 +11,10 @@ from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
+from .build import VERSION, build_id
 from .database import Database
 from .models import Event, Provider, SessionCreate, SessionPatch, State
 
-VERSION = "1.1.1"
 STATIC = Path(__file__).parent / "static"
 MAX_BODY = 65536
 
@@ -94,6 +94,7 @@ class RequestGuard:
 
 def create_app(settings=None):
     settings = settings or Settings.from_env()
+    build = build_id()
 
     @asynccontextmanager
     async def lifespan(app):
@@ -148,7 +149,7 @@ def create_app(settings=None):
     @app.get("/api/v1/health")
     def health():
         return {"status": "ok" if app.state.db.healthy() else "error", "version": VERSION,
-                "auth_required": bool(settings.api_token)}
+                "build": build, "auth_required": bool(settings.api_token)}
 
     @app.post("/api/v1/sessions", status_code=201)
     def create_session(data: SessionCreate):
@@ -175,7 +176,8 @@ def create_app(settings=None):
 
     @app.post("/api/v1/events")
     def event(data: Event):
-        return app.state.db.event(data)
+        session = app.state.db.event(data)
+        return session if session is not None else Response(status_code=204)
 
     @app.post("/api/v1/sessions/{session_id}/archive")
     def archive_session(session_id: str):

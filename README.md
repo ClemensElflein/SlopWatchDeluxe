@@ -151,22 +151,36 @@ directory. Select **Closed** to view them:
 
 ![The Closed filter shows an earlier session while the attention count is zero and the summary is neutral](docs/screenshots/slopwatchdeluxe-closed-sessions.png?v=1.1.0)
 
+Codex completion notifications update sessions already registered by lifecycle
+hooks. Background title and recap jobs cannot create cards. On upgrade, existing
+notification-only records move to Archived; genuine sessions in the same
+project remain separate. This fix requires only a server update.
+
 ## Builds and development
 
 Naturally, the slop comes with a build pipeline.
 
+The header shows the running server's Git build, such as
+`v1.1.1-3-gabc1234`; local modifications add `-dirty`. Published images carry
+this identity from CI, and source runs read it at startup. Images built without
+Git build metadata show `v1.1.1+unknown`.
+
 [The Docker workflow](.github/workflows/docker.yml) runs tests and builds Linux
 AMD64 and ARM64 images on pull requests, pushes to `main`, and version tags.
-Pushes to `main` publish `ghcr.io/clemenselflein/slopwatchdeluxe:latest`; `v*` tags
-publish versioned images. Pull requests build without publishing. The workflow
-uses GitHub's built-in token for the container registry.
+Pushes to `main` publish `ghcr.io/clemenselflein/slopwatchdeluxe:main`; `v*` tags
+publish versioned images and update `:latest`. Pull requests build without
+publishing. The workflow uses GitHub's built-in token for the container registry.
+
+Use `ghcr.io/clemenselflein/slopwatchdeluxe:main` in your Compose `image` setting
+to follow the newest successful build from `main`. Use `:latest` for releases,
+or a version tag such as `:v1.1.1` to pin a release.
 
 To build from a checkout:
 
 ```bash
 git clone https://github.com/ClemensElflein/SlopWatchDeluxe.git
 cd SlopWatchDeluxe
-docker compose up -d --build --wait
+SLOPWATCHDELUXE_BUILD="$(git describe --tags --always --long --dirty)" docker compose up -d --build --wait
 ```
 
 To run the tests:

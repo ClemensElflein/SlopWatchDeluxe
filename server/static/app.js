@@ -39,9 +39,16 @@ async function allSessions(isArchived) {
     if (batch.length < 1000) return result;
   }
 }
+async function refreshBuild() {
+  try {
+    const health = await api('/health');
+    $('build-version').textContent = 'Build ' + (health.build || `v${health.version}`);
+  } catch { /* Keep the last known build while reconnecting. */ }
+}
 async function refresh() {
   if (refreshRunning) { refreshAgain = true; return; }
   refreshRunning = true;
+  refreshBuild();
   try {
     do {
       refreshAgain = false;

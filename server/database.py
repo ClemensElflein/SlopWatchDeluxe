@@ -46,8 +46,33 @@ class Database:
                 UNIQUE(provider, hostname, provider_session_id)
             );
             CREATE INDEX IF NOT EXISTS sessions_activity ON sessions(archived_at, last_activity_at);
-            PRAGMA user_version=1;
         """)
+        self.migrate()
+
+    def migrate(self):
+        with self.transaction():
+            if self.conn.execute("PRAGMA user_version").fetchone()[0] >= 2:
+                return
+            # Older servers let notify register background title/recap threads.
+            # Retain them in Archived without letting more completions revive
+            # them. Preserve cards with lifecycle metadata or evidence of more
+            # than one update; old records do not retain their full event history.
+            notification_keys = {"turn_id", "provider_hook", "last_event", "last_agent_message"}
+            now = iso(utcnow())
+            for row in self.conn.execute("SELECT * FROM sessions WHERE provider='codex'").fetchall():
+                session = self.decode(row)
+                metadata = session["metadata"]
+                notify_only = (metadata.get("provider_hook") == "agent-turn-complete"
+                               and metadata.get("last_event") == "turn_finished"
+                               and not metadata.get("_custom_project")
+                               and (session["created_at"] == session["updated_at"]
+                                    or session["archived_at"] is not None)
+                               and {key for key in metadata if not key.startswith("_")} <= notification_keys)
+                metadata["_codex_registered"] = not notify_only
+                if notify_only and not session["archived_at"]:
+                    session.update(archived_at=now, updated_at=now)
+                self.save(session)
+            self.conn.execute("PRAGMA user_version=2")
 
     @contextmanager
     def transaction(self):
@@ -114,6 +139,8 @@ class Database:
 
     def new(self, data: SessionCreate, now):
         metadata = dict(data.metadata)
+        if data.provider == "codex":
+            metadata["_codex_registered"] = True
         if data.project_name:
             metadata["_custom_project"] = True
         return dict(id=str(uuid4()), **data.model_dump(exclude={"project_name", "metadata"}), metadata=metadata,
@@ -136,16 +163,23 @@ class Database:
             row = self.conn.execute(
                 "SELECT * FROM sessions WHERE provider=? AND hostname=? AND provider_session_id=?",
                 (data.provider, data.hostname, data.provider_session_id)).fetchone()
+            notification = (data.provider == "codex" and data.event == "turn_finished"
+                            and data.metadata.get("provider_hook") == "agent-turn-complete")
+            existing = self.decode(row) if row else None
+            if notification and (existing is None or not existing["metadata"].get("_codex_registered")):
+                return None
             received_at = utcnow()
             now = iso(received_at)
             stamp = min(iso(data.timestamp), now)
-            session = self.decode(row) if row else self.new(SessionCreate(
+            session = existing if existing else self.new(SessionCreate(
                 **data.model_dump(include={"provider", "provider_session_id", "hostname", "cwd"})), now)
             if (session["last_event_id"] == data.event_id or
                     (session["last_event_at"] and stamp < session["last_event_at"])):
                 return self.public(session)
             if transition(session, data.event, data.metadata, now=received_at, message=data.message) is False:
                 return self.public(session)
+            if data.provider == "codex" and not notification:
+                session["metadata"]["_codex_registered"] = True
             session["metadata"].update(data.metadata)
             session["metadata"]["last_event"] = data.event
             if data.cwd:

@@ -162,3 +162,100 @@ def test_installed_notify_argv_sends_completion_and_chains_existing(fake_home):
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+def test_background_notifications_do_not_create_or_duplicate_sessions(api, app):
+    codex = ADAPTERS['codex']
+    identity = {'session_id': 'interactive', 'cwd': '/work/shared',
+                'hook_event_name': 'UserPromptSubmit', 'prompt': 'Fix the bug'}
+    real = api.post('/api/v1/events', json=codex.normalize(identity, hostname='dev')).json()
+    revision = app.state.db.revision
+    # These have distinct thread IDs but the same project as the real session.
+    # Their content is deliberately irrelevant to the registration decision.
+    for thread, message in [('title-job', '{"title":"Fix the bug"}'),
+                            ('recap-job', '{"recap":"The bug is fixed"}'),
+                            ('other-job', 'Ordinary prose')]:
+        notification = codex.normalize_notification({'type': 'agent-turn-complete',
+            'thread-id': thread, 'cwd': '/work/shared', 'last-assistant-message': message}, hostname='dev')
+        for _ in range(2):
+            response = api.post('/api/v1/events', json=notification)
+            assert response.status_code == 204 and response.content == b''
+    assert app.state.db.revision == revision
+    assert api.get('/api/v1/sessions').json() == [real]
+    done = codex.normalize_notification({'type': 'agent-turn-complete', 'thread-id': 'interactive',
+        'last-assistant-message': '{"title":"A legitimate JSON answer"}'}, hostname='dev')
+    assert api.post('/api/v1/events', json={**done, 'hostname': 'other-machine'}).status_code == 204
+    completed = api.post('/api/v1/events', json=done).json()
+    assert completed['id'] == real['id'] and completed['state'] == 'ATTENTION'
+    assert completed['last_message'] == done['message']
+    # Distinct interactive sessions in one cwd must still get distinct cards.
+    second = api.post('/api/v1/events', json=codex.normalize(
+        {**identity, 'session_id': 'second-interactive'}, hostname='dev')).json()
+    assert second['id'] != real['id']
+    assert len(api.get('/api/v1/sessions').json()) == 2
+    api.delete('/api/v1/sessions/' + real['id'])
+    assert api.post('/api/v1/events', json=done).status_code == 204
+
+
+def test_notify_only_migration_preserves_sessions_and_blocks_reappearance(tmp_path):
+    import sqlite3
+    from fastapi.testclient import TestClient
+    from server.main import Settings, create_app
+
+    settings = Settings(database=str(tmp_path / 'legacy.db'))
+    codex = ADAPTERS['codex']
+    def completion(thread):
+        return codex.normalize_notification({'type': 'agent-turn-complete', 'thread-id': thread,
+            'cwd': '/work/shared', 'last-assistant-message': '{"title":"JSON can be a real answer"}'}, hostname='dev')
+
+    with TestClient(create_app(settings)) as api:
+        start = codex.normalize({'session_id': 'real', 'hook_event_name': 'SessionStart',
+                                 'source': 'startup', 'cwd': '/work/shared'}, hostname='dev')
+        api.post('/api/v1/events', json=start)
+        real = api.post('/api/v1/events', json=completion('real')).json()
+        # Minimal old hooks may leave no model/source/prompt metadata after
+        # notify overwrites provider_hook. Their separate updates prove that
+        # these were not one-shot notification-created cards.
+        minimal_start = codex.normalize({'session_id': 'minimal-real',
+                                         'hook_event_name': 'SessionStart'}, hostname='dev')
+        api.post('/api/v1/events', json=minimal_start)
+        minimal = api.post('/api/v1/events', json=completion('minimal-real')).json()
+        # Seed exactly the record shape produced by a pre-fix notify-only upsert.
+        ghosts = []
+        for thread in ('background', 'already-archived'):
+            notification = completion(thread)
+            ghosts.append(api.post('/api/v1/sessions', json={
+                'provider': 'codex', 'provider_session_id': thread, 'hostname': 'dev',
+                'cwd': '/work/shared', 'state': 'ATTENTION', 'attention_reason': 'turn_finished',
+                'last_message': notification['message'], 'metadata': {
+                    **notification['metadata'], 'last_event': 'turn_finished',
+                    'last_agent_message': notification['message']}}).json())
+        archived = api.post('/api/v1/sessions/' + ghosts[1]['id'] + '/archive').json()
+        claude = api.post('/api/v1/events', json={'provider': 'claude',
+            'provider_session_id': 'claude', 'hostname': 'dev', 'event': 'turn_finished'}).json()
+    with sqlite3.connect(settings.database) as conn:
+        conn.execute("UPDATE sessions SET metadata=json_remove(metadata, '$._codex_registered')")
+        conn.execute('PRAGMA user_version=1')
+
+    app = create_app(settings)
+    with TestClient(app) as api:
+        assert {s['id'] for s in api.get('/api/v1/sessions').json()} == {real['id'], minimal['id'], claude['id']}
+        migrated = api.get('/api/v1/sessions?archived=true').json()
+        assert {s['id'] for s in migrated} == {s['id'] for s in ghosts}
+        assert api.get('/api/v1/sessions/' + ghosts[1]['id']).json() == archived
+        for ghost in ghosts:
+            assert api.post('/api/v1/events', json=completion(ghost['provider_session_id'])).status_code == 204
+        assert api.get('/api/v1/sessions?archived=true').json() == migrated
+        assert api.post('/api/v1/events', json=completion('real')).json()['id'] == real['id']
+        # A manually restored record is not re-archived on the next startup.
+        restored = api.post('/api/v1/sessions/' + ghosts[0]['id'] + '/restore').json()
+    with TestClient(create_app(settings)) as api:
+        assert api.get('/api/v1/sessions/' + ghosts[0]['id']).json() == restored
+        assert api.post('/api/v1/events', json=completion('background')).status_code == 204
+        # Actual lifecycle evidence can recover a record if the old client had
+        # previously missed its registration hooks.
+        work = codex.normalize({'session_id': 'background', 'hook_event_name': 'UserPromptSubmit',
+                                'prompt': 'Real work'}, hostname='dev')
+        assert api.post('/api/v1/events', json=work).json()['id'] == ghosts[0]['id']
+        assert api.post('/api/v1/events', json=completion('background')).json()['state'] == 'ATTENTION'
+        assert api.post('/api/v1/events', json=completion('real')).json()['id'] == real['id']

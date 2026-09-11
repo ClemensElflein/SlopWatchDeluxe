@@ -13,9 +13,15 @@ Copy `.env.example` to `.env` to override Compose defaults:
 | `SLOPWATCHDELUXE_ARCHIVE_AFTER_HOURS` | `24` | Positive number of hours without activity before archiving; fractions accepted |
 | `SLOPWATCHDELUXE_API_TOKEN` | empty | Optional shared API bearer token |
 | `SLOPWATCHDELUXE_DATABASE` | `/data/slopwatchdeluxe.db` in Docker | SQLite file; Compose deliberately keeps this inside the volume |
+| `SLOPWATCHDELUXE_BUILD` | Git describe for source runs; version + `unknown` otherwise | Build identity shown in the UI and health API; supplied as a build argument for local Docker/Compose builds and baked into published images by CI |
 
 Apply changes with `docker compose up -d`. For a different database filename,
 edit the Compose service environment and keep the file under `/data`.
+Image tags select the update channel: `ghcr.io/clemenselflein/slopwatchdeluxe:main`
+follows successful builds from `main`, `:latest` follows version-tagged releases,
+and `:v1.1.1` (for example) pins a release. Set the desired tag in the Compose
+service's `image` field. Building locally does not publish an image.
+
 The server uses one worker. SSE invalidation is in-process; do not run multiple
 workers or replicas against the same SQLite file.
 
@@ -50,6 +56,18 @@ Restoring counts as manual activity and grants another full archive interval;
 a new hook event also restores its session automatically. Deleting a record
 is permanent, but a future event for that provider session creates a new card.
 Use archive to retain history. There is no permanent event log or transcript.
+
+Codex `agent-turn-complete` notifications only update a registered session,
+matching provider, hostname, and provider session ID. They do not create or
+recreate missing records: background title/recap threads also emit this callback.
+A lifecycle hook (or explicit session creation) registers a session. If every
+registration hook was missed or disabled, completion stays ignored until a
+lifecycle event arrives. The upgrade archives untouched, single-update Codex
+records whose only recorded source was this callback and prevents later callbacks
+from reviving them. Existing archived callback-only records also stay archived.
+It retains their contents and IDs, and runs once; a real lifecycle event can
+register and restore them later. Sessions with lifecycle metadata and
+separate interactive sessions in the same project remain intact.
 
 For a consistent backup, stop the service before copying the volume, or use
 SQLite's backup API inside the container:
@@ -191,10 +209,10 @@ OpenAPI schema: `/openapi.json`. All routes below use JSON.
 | GET | `/api/v1/sessions/{id}` | Read one record |
 | PATCH | `/api/v1/sessions/{id}` | Set project name, state (including acknowledgment), or last message |
 | DELETE | `/api/v1/sessions/{id}` | Permanently delete; returns 204 |
-| POST | `/api/v1/events` | Apply a normalized event; upsert missing session |
+| POST | `/api/v1/events` | Apply a normalized event; upsert missing session, except unregistered Codex completion callbacks (ignored with 204) |
 | POST | `/api/v1/sessions/{id}/archive` | Archive manually |
 | POST | `/api/v1/sessions/{id}/restore` | Restore manually |
-| GET | `/api/v1/health` | Check application/database health |
+| GET | `/api/v1/health` | Check application/database health; includes release `version` and running Git `build` |
 | GET | `/api/v1/stream` | SSE change notifications; refetch sessions on change |
 
 List query parameters: `archived=true`, `state=ATTENTION`, `provider=claude`,
@@ -232,13 +250,18 @@ python3 dist/slopwatchdeluxe.pyz install
 The builder uses sorted entries, fixed timestamps/permissions, and the standard
 library. Identical source and Python/zlib toolchain produce identical zipapp
 bytes. Docker builds its own client artifact; rebuild the image after editing
-client or server source with `docker compose up -d --build`.
+client or server source using the build command below. The build argument is
+needed because `.git` is intentionally excluded from the image context. Direct
+`docker build` accepts the same value via `--build-arg SLOPWATCHDELUXE_BUILD=...`.
+Published images receive it automatically from CI. Source runs use
+`git describe --tags --always --long --dirty` once per server startup; build
+identity remains fixed for that running process.
 
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -e '.[test]'
 .venv/bin/pytest -q
-docker compose up -d --build --wait
+SLOPWATCHDELUXE_BUILD="$(git describe --tags --always --long --dirty)" docker compose up -d --build --wait
 python3 scripts/smoke-test.py http://localhost:8765
 ```
 

@@ -29,8 +29,9 @@ def handle(provider, config_file=None, notification=None):
             if event["event"] == "permission_required":
                 event["metadata"]["permission_request_id"] = event["event_id"]
             session = request(load_config(config_file), "/api/v1/events", event)
-            from .execution import start_watcher
-            start_watcher(payload, event, session["id"], config_file)
+            if session:
+                from .execution import start_watcher
+                start_watcher(payload, event, session["id"], config_file)
     except (Exception, KeyboardInterrupt):
         pass
     finally:

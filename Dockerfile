@@ -1,7 +1,9 @@
 FROM python:3.12-slim
 
+ARG SLOPWATCHDELUXE_BUILD
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
-    SLOPWATCHDELUXE_DATABASE=/data/slopwatchdeluxe.db SLOPWATCHDELUXE_PORT=8765
+    SLOPWATCHDELUXE_DATABASE=/data/slopwatchdeluxe.db SLOPWATCHDELUXE_PORT=8765 \
+    SLOPWATCHDELUXE_BUILD=${SLOPWATCHDELUXE_BUILD}
 LABEL org.opencontainers.image.title="SlopWatchDeluxe" \
       org.opencontainers.image.source="https://github.com/ClemensElflein/SlopWatchDeluxe" \
       org.opencontainers.image.licenses="GPL-3.0-only"
